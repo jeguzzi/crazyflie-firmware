@@ -25,6 +25,7 @@ PLATFORM					?= CF2
 LPS_TDMA_ENABLE   ?= 0
 LPS_TDOA_ENABLE   ?= 0
 LPS_TDOA3_ENABLE  ?= 0
+LEDRING_IS_ABOVE      ?= 0
 
 ######### Stabilizer configuration ##########
 ##### Sets the name of the stabilizer module to use.
@@ -123,8 +124,23 @@ PROJ_OBJ += main.o
 PROJ_OBJ_CF2 += platform_cf2.o
 
 # Drivers
-PROJ_OBJ += exti.o nvic.o motors.o
-PROJ_OBJ_CF2 += led_f405.o mpu6500.o i2cdev_f405.o ws2812_cf2.o lps25h.o i2c_drv.o
+PROJ_OBJ += exti.o motors.o
+
+ifeq ($(LEDRING_IS_ABOVE), 1)
+PROJ_OBJ += nvic_UP.o
+else
+PROJ_OBJ += nvic.o
+endif
+
+
+PROJ_OBJ_CF2 += led_f405.o mpu6500.o i2cdev_f405.o  lps25h.o i2c_drv.o
+
+ifeq ($(LEDRING_IS_ABOVE), 1)
+PROJ_OBJ_CF2 += ws2812_cf2_UP.o
+else
+PROJ_OBJ_CF2 += ws2812_cf2.o
+endif
+
 PROJ_OBJ_CF2 += ak8963.o eeprom.o maxsonar.o piezo.o
 PROJ_OBJ_CF2 += uart_syslink.o swd.o uart1.o uart2.o watchdog.o
 PROJ_OBJ_CF2 += cppm.o
@@ -178,7 +194,14 @@ PROJ_OBJ_CF2 += deck_spi.o
 # Decks
 PROJ_OBJ_CF2 += bigquad.o
 PROJ_OBJ_CF2 += rzr.o
-PROJ_OBJ_CF2 += ledring12.o
+
+ifeq ($(LEDRING_IS_ABOVE), 1)
+PROJ_OBJ_CF2 += ledring12_UP.o
+else
+PROJ_OBJ_CF2 += ledring12_status.o
+endif
+
+
 PROJ_OBJ_CF2 += buzzdeck.o
 PROJ_OBJ_CF2 += gtgps.o
 PROJ_OBJ_CF2 += cppmdeck.o
@@ -193,6 +216,8 @@ PROJ_OBJ_CF2 += outlierFilter.o
 PROJ_OBJ_CF2 += flowdeck_v1v2.o
 PROJ_OBJ_CF2 += oa.o
 PROJ_OBJ_CF2 += multiranger.o
+PROJ_OBJ_CF2 += blinkM_led.o
+PROJ_OBJ_CF2 += statusLed.o
 
 ifeq ($(LPS_TDOA_ENABLE), 1)
 CFLAGS += -DLPS_TDOA_ENABLE
@@ -301,7 +326,7 @@ CFLAGS += -Wdouble-promotion
 
 
 ASFLAGS = $(PROCESSOR) $(INCLUDES)
-LDFLAGS = --specs=nosys.specs --specs=nano.specs $(PROCESSOR) -Wl,-Map=$(PROG).map,--cref,--gc-sections,--undefined=uxTopUsedPriority 
+LDFLAGS = --specs=nosys.specs --specs=nano.specs $(PROCESSOR) -Wl,-Map=$(PROG).map,--cref,--gc-sections,--undefined=uxTopUsedPriority
 
 #Flags required by the ST library
 ifeq ($(CLOAD), 1)

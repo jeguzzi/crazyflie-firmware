@@ -80,4 +80,6 @@ void estimatorKalmanSetShift(float deltax, float deltay);
 
 void estimatorKalmanGetEstimatedPos(point_t* pos);
 
+bool estimatorKalmanIsFlying();
+
 #endif // __ESTIMATOR_KALMAN_H__

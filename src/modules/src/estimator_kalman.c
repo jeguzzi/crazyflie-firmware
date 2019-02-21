@@ -230,6 +230,10 @@ static float measNoiseGyro_yaw = 0.1f; // radians per second
 static float initialX = 0.5;
 static float initialY = 0.5;
 static float initialZ = 0.0;
+static float initialQx = 0.0;
+static float initialQy = 0.0;
+static float initialQz = 0.0;
+static float initialQw = 1.0;
 
 // We track a TDOA skew as part of the Kalman filter
 static const float stdDevInitialSkew = 0.1;
@@ -1021,6 +1025,7 @@ static float predictedNX;
 static float predictedNY;
 static float measuredNX;
 static float measuredNY;
+static float thetapix_deg = 4.2;
 
 static void stateEstimatorUpdateWithFlow(flowMeasurement_t *flow, sensorData_t *sensors)
 {
@@ -1030,7 +1035,7 @@ static void stateEstimatorUpdateWithFlow(flowMeasurement_t *flow, sensorData_t *
   // The angle of aperture is guessed from the raw data register and thankfully look to be symmetric
   float Npix = 30.0;                      // [pixels] (same in x and y)
   //float thetapix = DEG_TO_RAD * 4.0f;     // [rad]    (same in x and y)
-  float thetapix = DEG_TO_RAD * 4.2f;
+  float thetapix = DEG_TO_RAD * thetapix_deg;
   //~~~ Body rates ~~~
   // TODO check if this is feasible or if some filtering has to be done
   omegax_b = sensors->gyro.x * DEG_TO_RAD;
@@ -1344,7 +1349,7 @@ void estimatorKalmanInit(void) {
   S[STATE_D2] = 0;
 
   // reset the attitude quaternion
-  q[0] = 1; q[1] = 0; q[2] = 0; q[3] = 0;
+  q[0] = initialQw; q[1] = initialQx; q[2] = initialQy; q[3] = initialQz;
 
   // then set the initial rotation matrix to the identity. This only affects
   // the first prediction step, since in the finalization, after shifting
@@ -1458,6 +1463,11 @@ void estimatorKalmanGetEstimatedPos(point_t* pos) {
   pos->z = S[STATE_Z];
 }
 
+bool estimatorKalmanIsFlying()
+{
+  return quadIsFlying;
+}
+
 // Temporary development groups
 LOG_GROUP_START(kalman_states)
   LOG_ADD(LOG_FLOAT, ox, &S[STATE_X])
@@ -1517,4 +1527,9 @@ PARAM_GROUP_START(kalman)
   PARAM_ADD(PARAM_FLOAT, initialX, &initialX)
   PARAM_ADD(PARAM_FLOAT, initialY, &initialY)
   PARAM_ADD(PARAM_FLOAT, initialZ, &initialZ)
+  PARAM_ADD(PARAM_FLOAT, initialQx, &initialQx)
+  PARAM_ADD(PARAM_FLOAT, initialQy, &initialQy)
+  PARAM_ADD(PARAM_FLOAT, initialQz, &initialQz)
+  PARAM_ADD(PARAM_FLOAT, initialQw, &initialQw)
+  PARAM_ADD(PARAM_FLOAT, thetapix, &thetapix_deg)
 PARAM_GROUP_STOP(kalman)

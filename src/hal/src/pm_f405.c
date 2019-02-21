@@ -1,6 +1,6 @@
 /**
- *    ||          ____  _ __                           
- * +------+      / __ )(_) /_______________ _____  ___ 
+ *    ||          ____  _ __
+ * +------+      / __ )(_) /_______________ _____  ___
  * | 0xBC |     / __  / / __/ ___/ ___/ __ `/_  / / _ \
  * +------+    / /_/ / / /_/ /__/ /  / /_/ / / /_/  __/
  *  ||  ||    /_____/_/\__/\___/_/   \__,_/ /___/\___/
@@ -99,10 +99,10 @@ void pmInit(void)
 {
   if(isInit)
     return;
-  
+
   xTaskCreate(pmTask, PM_TASK_NAME,
               PM_TASK_STACKSIZE, NULL, PM_TASK_PRI, NULL);
-  
+
   isInit = true;
 
   pmSyslinkInfo.vBat = 3.7f;
@@ -277,7 +277,7 @@ bool pmIsDischarging(void) {
 
 void pmTask(void *param)
 {
-  PMStates pmStateOld = battery;
+  PMStates pmStateOld = shutDown;
   uint32_t tickCount;
 
   vTaskSetApplicationTaskTag(0, (void*)TASK_PM_ID_NBR);
@@ -394,4 +394,3 @@ LOG_ADD(LOG_FLOAT, chargeCurrent, &pmSyslinkInfo.chargeCurrent)
 LOG_ADD(LOG_INT8, state, &pmState)
 LOG_ADD(LOG_UINT8, batteryLevel, &batteryLevel)
 LOG_GROUP_STOP(pm)
-

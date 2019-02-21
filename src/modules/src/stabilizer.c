@@ -253,9 +253,16 @@ LOG_GROUP_START(stateEstimate)
 LOG_ADD(LOG_FLOAT, x, &state.position.x)
 LOG_ADD(LOG_FLOAT, y, &state.position.y)
 LOG_ADD(LOG_FLOAT, z, &state.position.z)
+// NEW
+LOG_ADD(LOG_FLOAT, vx, &state.velocity.x)
+LOG_ADD(LOG_FLOAT, vy, &state.velocity.y)
+LOG_ADD(LOG_FLOAT, vz, &state.velocity.z)
+LOG_ADD(LOG_FLOAT, qx, &state.attitudeQuaternion.x)
+LOG_ADD(LOG_FLOAT, qy, &state.attitudeQuaternion.y)
+LOG_ADD(LOG_FLOAT, qz, &state.attitudeQuaternion.z)
+LOG_ADD(LOG_FLOAT, qw, &state.attitudeQuaternion.w)
 LOG_GROUP_STOP(stateEstimate)
 
 LOG_GROUP_START(latency)
 LOG_ADD(LOG_UINT32, intToOut, &inToOutLatency)
 LOG_GROUP_STOP(latency)
-
