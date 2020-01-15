@@ -67,7 +67,6 @@
 #include "task.h"
 #include "semphr.h"
 #include "sensors.h"
-#include "static_mem.h"
 
 #include "system.h"
 #include "log.h"
@@ -96,7 +95,7 @@
 
 // Distance-to-point measurements
 static xQueueHandle distDataQueue;
-STATIC_MEM_QUEUE_ALLOC(distDataQueue, 10, sizeof(distanceMeasurement_t));
+#define DIST_QUEUE_LENGTH (10)
 
 static inline bool stateEstimatorHasDistanceMeasurement(distanceMeasurement_t *dist) {
   return (pdTRUE == xQueueReceive(distDataQueue, dist, 0));
@@ -104,7 +103,7 @@ static inline bool stateEstimatorHasDistanceMeasurement(distanceMeasurement_t *d
 
 // Direct measurements of Crazyflie position
 static xQueueHandle posDataQueue;
-STATIC_MEM_QUEUE_ALLOC(posDataQueue, 10, sizeof(positionMeasurement_t));
+#define POS_QUEUE_LENGTH (10)
 
 static inline bool stateEstimatorHasPositionMeasurement(positionMeasurement_t *pos) {
   return (pdTRUE == xQueueReceive(posDataQueue, pos, 0));
@@ -112,7 +111,7 @@ static inline bool stateEstimatorHasPositionMeasurement(positionMeasurement_t *p
 
 // Direct measurements of Crazyflie pose
 static xQueueHandle poseDataQueue;
-STATIC_MEM_QUEUE_ALLOC(poseDataQueue, 10, sizeof(poseMeasurement_t));
+#define POSE_QUEUE_LENGTH (10)
 
 static inline bool stateEstimatorHasPoseMeasurement(poseMeasurement_t *pose) {
   return (pdTRUE == xQueueReceive(poseDataQueue, pose, 0));
@@ -120,15 +119,16 @@ static inline bool stateEstimatorHasPoseMeasurement(poseMeasurement_t *pose) {
 
 // Measurements of a UWB Tx/Rx
 static xQueueHandle tdoaDataQueue;
-STATIC_MEM_QUEUE_ALLOC(tdoaDataQueue, 10, sizeof(tdoaMeasurement_t));
+#define UWB_QUEUE_LENGTH (10)
 
 static inline bool stateEstimatorHasTDOAPacket(tdoaMeasurement_t *uwb) {
   return (pdTRUE == xQueueReceive(tdoaDataQueue, uwb, 0));
 }
 
+
 // Measurements of flow (dnx, dny)
 static xQueueHandle flowDataQueue;
-STATIC_MEM_QUEUE_ALLOC(flowDataQueue, 10, sizeof(flowMeasurement_t));
+#define FLOW_QUEUE_LENGTH (10)
 
 static inline bool stateEstimatorHasFlowPacket(flowMeasurement_t *flow) {
   return (pdTRUE == xQueueReceive(flowDataQueue, flow, 0));
@@ -136,7 +136,7 @@ static inline bool stateEstimatorHasFlowPacket(flowMeasurement_t *flow) {
 
 // Measurements of TOF from laser sensor
 static xQueueHandle tofDataQueue;
-STATIC_MEM_QUEUE_ALLOC(tofDataQueue, 10, sizeof(tofMeasurement_t));
+#define TOF_QUEUE_LENGTH (10)
 
 static inline bool stateEstimatorHasTOFPacket(tofMeasurement_t *tof) {
   return (pdTRUE == xQueueReceive(tofDataQueue, tof, 0));
@@ -144,15 +144,14 @@ static inline bool stateEstimatorHasTOFPacket(tofMeasurement_t *tof) {
 
 // Absolute height measurement along the room Z
 static xQueueHandle heightDataQueue;
-STATIC_MEM_QUEUE_ALLOC(heightDataQueue, 10, sizeof(heightMeasurement_t));
+#define HEIGHT_QUEUE_LENGTH (10)
 
 static inline bool stateEstimatorHasHeightPacket(heightMeasurement_t *height) {
   return (pdTRUE == xQueueReceive(heightDataQueue, height, 0));
 }
 
-
 static xQueueHandle yawErrorDataQueue;
-STATIC_MEM_QUEUE_ALLOC(yawErrorDataQueue, 10, sizeof(yawErrorMeasurement_t));
+#define YAW_ERROR_QUEUE_LENGTH (10)
 
 static inline bool stateEstimatorHasYawErrorPacket(yawErrorMeasurement_t *error)
 {
@@ -160,7 +159,7 @@ static inline bool stateEstimatorHasYawErrorPacket(yawErrorMeasurement_t *error)
 }
 
 static xQueueHandle sweepAnglesDataQueue;
-STATIC_MEM_QUEUE_ALLOC(sweepAnglesDataQueue, 10, sizeof(sweepAngleMeasurement_t));
+#define SWEEP_ANGLES_QUEUE_LENGTH (10)
 
 static inline bool stateEstimatorHasSweepAnglesPacket(sweepAngleMeasurement_t *angles)
 {
@@ -173,7 +172,6 @@ static SemaphoreHandle_t runTaskSemaphore;
 // Mutex to protect data that is shared between the task and
 // functions called by the stabilizer loop
 static SemaphoreHandle_t dataMutex;
-static StaticSemaphore_t dataMutexBuffer;
 
 
 /**
@@ -200,41 +198,7 @@ static StaticSemaphore_t dataMutexBuffer;
 #define MAX_COVARIANCE (100)
 #define MIN_COVARIANCE (1e-6f)
 
-<<<<<<< HEAD
-// The bounds on states, these shouldn't be hit...
-#define MAX_POSITION (100) //meters
-#define MAX_VELOCITY (10) //meters per second
 
-// Initial variances, uncertain of position, but know we're stationary and roughly flat
-static const float stdDevInitialPosition_xy = 100;
-static const float stdDevInitialPosition_z = 1;
-static const float stdDevInitialVelocity = 0.01;
-static const float stdDevInitialAttitude_rollpitch = 0.01;
-static const float stdDevInitialAttitude_yaw = 0.01;
-
-static float procNoiseAcc_xy = 0.5f;
-static float procNoiseAcc_z = 1.0f;
-static float procNoiseVel = 0;
-static float procNoisePos = 0;
-static float procNoiseAtt = 0;
-static float measNoiseBaro = 2.0f; // meters
-static float measNoiseGyro_rollpitch = 0.1f; // radians per second
-static float measNoiseGyro_yaw = 0.1f; // radians per second
-
-static float initialX = 0.5;
-static float initialY = 0.5;
-static float initialZ = 0.0;
-static float initialQx = 0.0;
-static float initialQy = 0.0;
-static float initialQz = 0.0;
-static float initialQw = 1.0;
-
-// We track a TDOA skew as part of the Kalman filter
-static const float stdDevInitialSkew = 0.1;
-static float procNoiseSkew = 10e-6f; // seconds per second^2 (is multiplied by dt to give skew noise)
-=======
-
->>>>>>> 2e5d259f68b32ef932d1e6077b853c5401e8da43
 
 /**
  * Quadrocopter State
@@ -304,27 +268,26 @@ static void kalmanTask(void* parameters);
 static bool predictStateForward(uint32_t osTick, float dt);
 static bool updateQueuedMeasurments(const Axis3f *gyro, const uint32_t tick);
 
-STATIC_MEM_TASK_ALLOC(kalmanTask, 3 * configMINIMAL_STACK_SIZE);
 
 // --------------------------------------------------
 
 // Called one time during system startup
 void estimatorKalmanTaskInit() {
-  distDataQueue = STATIC_MEM_QUEUE_CREATE(distDataQueue);
-  posDataQueue = STATIC_MEM_QUEUE_CREATE(posDataQueue);
-  poseDataQueue = STATIC_MEM_QUEUE_CREATE(poseDataQueue);
-  tdoaDataQueue = STATIC_MEM_QUEUE_CREATE(tdoaDataQueue);
-  flowDataQueue = STATIC_MEM_QUEUE_CREATE(flowDataQueue);
-  tofDataQueue = STATIC_MEM_QUEUE_CREATE(tofDataQueue);
-  heightDataQueue = STATIC_MEM_QUEUE_CREATE(heightDataQueue);
-  yawErrorDataQueue = STATIC_MEM_QUEUE_CREATE(yawErrorDataQueue);
-  sweepAnglesDataQueue = STATIC_MEM_QUEUE_CREATE(sweepAnglesDataQueue);
+  distDataQueue = xQueueCreate(DIST_QUEUE_LENGTH, sizeof(distanceMeasurement_t));
+  posDataQueue = xQueueCreate(POS_QUEUE_LENGTH, sizeof(positionMeasurement_t));
+  poseDataQueue = xQueueCreate(POSE_QUEUE_LENGTH, sizeof(poseMeasurement_t));
+  tdoaDataQueue = xQueueCreate(UWB_QUEUE_LENGTH, sizeof(tdoaMeasurement_t));
+  flowDataQueue = xQueueCreate(FLOW_QUEUE_LENGTH, sizeof(flowMeasurement_t));
+  tofDataQueue = xQueueCreate(TOF_QUEUE_LENGTH, sizeof(tofMeasurement_t));
+  heightDataQueue = xQueueCreate(HEIGHT_QUEUE_LENGTH, sizeof(heightMeasurement_t));
+  yawErrorDataQueue = xQueueCreate(YAW_ERROR_QUEUE_LENGTH, sizeof(yawErrorMeasurement_t));
+  sweepAnglesDataQueue = xQueueCreate(SWEEP_ANGLES_QUEUE_LENGTH, sizeof(sweepAngleMeasurement_t));
 
   vSemaphoreCreateBinary(runTaskSemaphore);
 
-  dataMutex = xSemaphoreCreateMutexStatic(&dataMutexBuffer);
+  dataMutex = xSemaphoreCreateMutex();
 
-  STATIC_MEM_TASK_CREATE(kalmanTask, kalmanTask, KALMAN_TASK_NAME, NULL, KALMAN_TASK_PRI);
+  xTaskCreate(kalmanTask, KALMAN_TASK_NAME, 3 * configMINIMAL_STACK_SIZE, NULL, KALMAN_TASK_PRI, NULL);
 
   isInit = true;
 }
@@ -573,64 +536,11 @@ static bool updateQueuedMeasurments(const Axis3f *gyro, const uint32_t tick) {
     doneUpdate = true;
   }
 
-<<<<<<< HEAD
-  tdoaCount++;
-}
-
-// TODO remove the temporary test variables (used for logging)
-static float omegax_b;
-static float omegay_b;
-static float dx_g;
-static float dy_g;
-static float z_g;
-static float predictedNX;
-static float predictedNY;
-static float measuredNX;
-static float measuredNY;
-static float thetapix_deg = 4.2;
-
-static void stateEstimatorUpdateWithFlow(flowMeasurement_t *flow, sensorData_t *sensors)
-{
-  // Inclusion of flow measurements in the EKF done by two scalar updates
-
-  // ~~~ Camera constants ~~~
-  // The angle of aperture is guessed from the raw data register and thankfully look to be symmetric
-  float Npix = 30.0;                      // [pixels] (same in x and y)
-  //float thetapix = DEG_TO_RAD * 4.0f;     // [rad]    (same in x and y)
-  float thetapix = DEG_TO_RAD * thetapix_deg;
-  //~~~ Body rates ~~~
-  // TODO check if this is feasible or if some filtering has to be done
-  omegax_b = sensors->gyro.x * DEG_TO_RAD;
-  omegay_b = sensors->gyro.y * DEG_TO_RAD;
-
-  // ~~~ Moves the body velocity into the global coordinate system ~~~
-  // [bar{x},bar{y},bar{z}]_G = R*[bar{x},bar{y},bar{z}]_B
-  //
-  // \dot{x}_G = (R^T*[dot{x}_B,dot{y}_B,dot{z}_B])\dot \hat{x}_G
-  // \dot{x}_G = (R^T*[dot{x}_B,dot{y}_B,dot{z}_B])\dot \hat{x}_G
-  //
-  // where \hat{} denotes a basis vector, \dot{} denotes a derivative and
-  // _G and _B refer to the global/body coordinate systems.
-
-  // Modification 1
-  //dx_g = R[0][0] * S[STATE_PX] + R[0][1] * S[STATE_PY] + R[0][2] * S[STATE_PZ];
-  //dy_g = R[1][0] * S[STATE_PX] + R[1][1] * S[STATE_PY] + R[1][2] * S[STATE_PZ];
-
-
-  dx_g = S[STATE_PX];
-  dy_g = S[STATE_PY];
-  // Saturate elevation in prediction and correction to avoid singularities
-  if ( S[STATE_Z] < 0.1f ) {
-      z_g = 0.1;
-  } else {
-      z_g = S[STATE_Z];
-=======
   positionMeasurement_t pos;
   while (stateEstimatorHasPositionMeasurement(&pos))
   {
     kalmanCoreUpdateWithPosition(&coreData, &pos);
     doneUpdate = true;
->>>>>>> 2e5d259f68b32ef932d1e6077b853c5401e8da43
   }
 
   poseMeasurement_t pose;
@@ -685,57 +595,7 @@ void estimatorKalmanInit(void) {
   baroAccumulatorCount = 0;
   xSemaphoreGive(dataMutex);
 
-<<<<<<< HEAD
-  // Reset all matrices to 0 (like uppon system reset)
-  memset(q, 0, sizeof(q));
-  memset(R, 0, sizeof(R));
-  memset(P, 0, sizeof(S));
-
-  // TODO: Can we initialize this more intelligently?
-  S[STATE_X] = initialX;
-  S[STATE_Y] = initialY;
-  S[STATE_Z] = initialZ;
-  S[STATE_PX] = 0;
-  S[STATE_PY] = 0;
-  S[STATE_PZ] = 0;
-  S[STATE_D0] = 0;
-  S[STATE_D1] = 0;
-  S[STATE_D2] = 0;
-
-  // reset the attitude quaternion
-  q[0] = initialQw; q[1] = initialQx; q[2] = initialQy; q[3] = initialQz;
-
-  // then set the initial rotation matrix to the identity. This only affects
-  // the first prediction step, since in the finalization, after shifting
-  // attitude errors into the attitude state, the rotation matrix is updated.
-  for(int i=0; i<3; i++) { for(int j=0; j<3; j++) { R[i][j] = i==j ? 1 : 0; }}
-
-  for (int i=0; i< STATE_DIM; i++) {
-    for (int j=0; j < STATE_DIM; j++) {
-      P[i][j] = 0; // set covariances to zero (diagonals will be changed from zero in the next section)
-    }
-  }
-
-  // initialize state variances
-  P[STATE_X][STATE_X]  = powf(stdDevInitialPosition_xy, 2);
-  P[STATE_Y][STATE_Y]  = powf(stdDevInitialPosition_xy, 2);
-  P[STATE_Z][STATE_Z]  = powf(stdDevInitialPosition_z, 2);
-
-  P[STATE_PX][STATE_PX] = powf(stdDevInitialVelocity, 2);
-  P[STATE_PY][STATE_PY] = powf(stdDevInitialVelocity, 2);
-  P[STATE_PZ][STATE_PZ] = powf(stdDevInitialVelocity, 2);
-
-  P[STATE_D0][STATE_D0] = powf(stdDevInitialAttitude_rollpitch, 2);
-  P[STATE_D1][STATE_D1] = powf(stdDevInitialAttitude_rollpitch, 2);
-  P[STATE_D2][STATE_D2] = powf(stdDevInitialAttitude_yaw, 2);
-
-  varSkew = powf(stdDevInitialSkew, 2);
-
-  tdoaCount = 0;
-  isInit = true;
-=======
   kalmanCoreInit(&coreData);
->>>>>>> 2e5d259f68b32ef932d1e6077b853c5401e8da43
 }
 
 static bool appendMeasurement(xQueueHandle queue, void *measurement)
@@ -886,24 +746,4 @@ LOG_GROUP_STOP(kalman)
 PARAM_GROUP_START(kalman)
   PARAM_ADD(PARAM_UINT8, resetEstimation, &coreData.resetEstimation)
   PARAM_ADD(PARAM_UINT8, quadIsFlying, &quadIsFlying)
-<<<<<<< HEAD
-  PARAM_ADD(PARAM_FLOAT, pNAcc_xy, &procNoiseAcc_xy)
-  PARAM_ADD(PARAM_FLOAT, pNAcc_z, &procNoiseAcc_z)
-  PARAM_ADD(PARAM_FLOAT, pNVel, &procNoiseVel)
-  PARAM_ADD(PARAM_FLOAT, pNPos, &procNoisePos)
-  PARAM_ADD(PARAM_FLOAT, pNAtt, &procNoiseAtt)
-  PARAM_ADD(PARAM_FLOAT, pNSkew, &procNoiseSkew)
-  PARAM_ADD(PARAM_FLOAT, mNBaro, &measNoiseBaro)
-  PARAM_ADD(PARAM_FLOAT, mNGyro_rollpitch, &measNoiseGyro_rollpitch)
-  PARAM_ADD(PARAM_FLOAT, mNGyro_yaw, &measNoiseGyro_yaw)
-  PARAM_ADD(PARAM_FLOAT, initialX, &initialX)
-  PARAM_ADD(PARAM_FLOAT, initialY, &initialY)
-  PARAM_ADD(PARAM_FLOAT, initialZ, &initialZ)
-  PARAM_ADD(PARAM_FLOAT, initialQx, &initialQx)
-  PARAM_ADD(PARAM_FLOAT, initialQy, &initialQy)
-  PARAM_ADD(PARAM_FLOAT, initialQz, &initialQz)
-  PARAM_ADD(PARAM_FLOAT, initialQw, &initialQw)
-  PARAM_ADD(PARAM_FLOAT, thetapix, &thetapix_deg)
-=======
->>>>>>> 2e5d259f68b32ef932d1e6077b853c5401e8da43
 PARAM_GROUP_STOP(kalman)

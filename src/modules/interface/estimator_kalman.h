@@ -80,10 +80,9 @@ bool estimatorKalmanEnqueueSweepAngles(const sweepAngleMeasurement_t *angles);
 
 void estimatorKalmanGetEstimatedPos(point_t* pos);
 
-bool estimatorKalmanIsFlying();
 /**
  * Copies 9 floats representing the current state rotation matrix
  */
 void estimatorKalmanGetEstimatedRot(float * rotationMatrix);
-
+bool estimatorKalmanIsFlying();
 #endif // __ESTIMATOR_KALMAN_H__
