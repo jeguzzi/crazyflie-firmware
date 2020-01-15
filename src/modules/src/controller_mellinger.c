@@ -92,6 +92,8 @@ static float i_error_m_z = 0;
 
 // Logging variables
 static struct vec z_axis_desired;
+static struct vec r_error;
+static struct vec setpointPos;
 
 void controllerMellingerReset(void)
 {
@@ -124,7 +126,7 @@ void controllerMellinger(control_t *control, setpoint_t *setpoint,
                                          const state_t *state,
                                          const uint32_t tick)
 {
-  struct vec r_error;
+  // struct vec r_error;
   struct vec v_error;
   struct vec target_thrust;
   struct vec z_axis;
@@ -141,7 +143,8 @@ void controllerMellinger(control_t *control, setpoint_t *setpoint,
   }
 
   dt = (float)(1.0f/ATTITUDE_RATE);
-  struct vec setpointPos = mkvec(setpoint->position.x, setpoint->position.y, setpoint->position.z);
+  setpointPos = mkvec(setpoint->position.x, setpoint->position.y, setpoint->position.z);
+  // struct vec setpointPos = mkvec(setpoint->position.x, setpoint->position.y, setpoint->position.z);
   struct vec setpointVel = mkvec(setpoint->velocity.x, setpoint->velocity.y, setpoint->velocity.z);
   struct vec statePos = mkvec(state->position.x, state->position.y, state->position.z);
   struct vec stateVel = mkvec(state->velocity.x, state->velocity.y, state->velocity.z);
@@ -332,4 +335,10 @@ LOG_ADD(LOG_FLOAT, zdz, &z_axis_desired.z)
 LOG_ADD(LOG_FLOAT, i_err_x, &i_error_x)
 LOG_ADD(LOG_FLOAT, i_err_y, &i_error_y)
 LOG_ADD(LOG_FLOAT, i_err_z, &i_error_z)
+LOG_ADD(LOG_FLOAT, dx, &r_error.x)
+LOG_ADD(LOG_FLOAT, dy, &r_error.y)
+LOG_ADD(LOG_FLOAT, dz, &r_error.z)
+LOG_ADD(LOG_FLOAT, x, &setpointPos.x)
+LOG_ADD(LOG_FLOAT, y, &setpointPos.y)
+LOG_ADD(LOG_FLOAT, z, &setpointPos.z)
 LOG_GROUP_STOP(ctrlMel)
