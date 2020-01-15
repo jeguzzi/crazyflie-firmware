@@ -28,7 +28,7 @@ bool blinkMReadBytes(uint8_t key, uint8_t length, uint8_t * value)
 {
   i2cdevWriteByte(I2C1_DEV, BLINKM_DEFAULT_ADDRESS, I2CDEV_NO_MEM_ADDR, key);
   bool result = false;
-  while(!result) result = i2cdevRead(I2C1_DEV, BLINKM_DEFAULT_ADDRESS, I2CDEV_NO_MEM_ADDR, length, value);
+  while(!result) result = i2cdevRead(I2C1_DEV, BLINKM_DEFAULT_ADDRESS, length, value);
   return true;
 }
 
@@ -59,8 +59,14 @@ bool blinkMSetFadeSpeed(uint8_t speed, uint8_t index)
   }
   old_fade_speed = speed;
   uint8_t data[2] = {'f', speed};
-  bool result = i2cdevWrite(I2C1_DEV, b_addresses[index], I2CDEV_NO_MEM_ADDR, 2, data);
-  DEBUG_PRINT("BlinkM set fade speed %d => %d \n", data[1], result);
+  bool result = false;
+  int trials = 50;
+  while(!result && trials--)
+  {
+    result = i2cdevWrite(I2C1_DEV, b_addresses[index], 2, data);
+    vTaskDelay(10);
+  }
+  DEBUG_PRINT("BlinkM set fade speed %d => %d (%d) \n", data[1], result, trials);
   return result;
 }
 
@@ -70,7 +76,7 @@ void blinkMSetColor(uint8_t *color, uint8_t index)
   {
     // i2cdevWriteByte(I2C1_DEV, b_addresses[index], I2CDEV_NO_MEM_ADDR, 'n');
     uint8_t data[4] = {'n', color[0], color[1], color[2]};
-    i2cdevWrite(I2C1_DEV, b_addresses[index], I2CDEV_NO_MEM_ADDR, 4, data);
+    i2cdevWrite(I2C1_DEV, b_addresses[index], 4, data);
     // DEBUG_PRINT("BlinkM set color to (%d, %d, %d) \n", color[0], color[1], color[2]);
     memcpy(current_color, color, 3);
   }
@@ -81,8 +87,8 @@ void blinkMSetScript(uint32_t script, uint8_t index)
   uint8_t *data = (uint8_t *) &script;
   uint8_t data_p[4] = {'p', data[0], data[1], 0};
   uint8_t data_t[2] = {'t', data[2]};
-  bool result = i2cdevWrite(I2C1_DEV, b_addresses[index], I2CDEV_NO_MEM_ADDR, 2, data_t);
-  result = i2cdevWrite(I2C1_DEV, b_addresses[index], I2CDEV_NO_MEM_ADDR, 4, data_p);
+  bool result = i2cdevWrite(I2C1_DEV, b_addresses[index], 2, data_t);
+  result = i2cdevWrite(I2C1_DEV, b_addresses[index], 4, data_p);
   DEBUG_PRINT("BlinkM play script %d %d %d => %d \n", data[0], data[1], (int8_t) data[2], result);
 }
 
@@ -108,7 +114,7 @@ void blinkMSetCmd(uint32_t cmd)
       break;
   }
   if (length == 0xff) return;
-  i2cdevWrite(I2C1_DEV, b_addresses[0], I2CDEV_NO_MEM_ADDR, length, data);
+  i2cdevWrite(I2C1_DEV, b_addresses[0], length, data);
 }
 
 // void blinkMSetAddress(uint8_t address)
@@ -158,10 +164,9 @@ void blinkMInit(DeckInfo* info)
   vTaskDelay(10);
   DEBUG_PRINT("i2cdevInit => %d \n", res);
   isInit =  blinkMSetFadeSpeed(255, 0);
-
    if(isInit)
    {
-    blinkMGetInfo();
+    // blinkMGetInfo();
     // stopScript();
     // getColor();
     DEBUG_PRINT("BlinkM deck initialized! \n");
