@@ -27,7 +27,7 @@ PLATFORM          ?= cf2
 LPS_TDMA_ENABLE   ?= 0
 LPS_TDOA_ENABLE   ?= 0
 LPS_TDOA3_ENABLE  ?= 0
-LEDRING_IS_ABOVE      ?= 0
+LEDRING_IS_ABOVE  ?= 0
 
 
 # Platform configuration handling
@@ -201,7 +201,7 @@ else
 PROJ_OBJ += ledring12_status.o
 endif
 
-PROJ_OBJ += bigquad.oPROJ_OBJ += rzr.o
+PROJ_OBJ += bigquad.o
 # PROJ_OBJ += ledring12.o
 PROJ_OBJ += buzzdeck.o
 PROJ_OBJ += gtgps.o
