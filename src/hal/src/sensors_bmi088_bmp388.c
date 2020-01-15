@@ -33,9 +33,6 @@
 
 #include "imu.h"
 
-#include "zranger.h"
-#include "zranger2.h"
-
 #include "FreeRTOS.h"
 #include "semphr.h"
 #include "task.h"
@@ -53,6 +50,7 @@
 #include "bmi088.h"
 #include "bmp3.h"
 #include "bstdr_types.h"
+#include "static_mem.h"
 
 #define GYRO_ADD_RAW_AND_VARIANCE_LOG_VALUES
 
@@ -104,26 +102,35 @@ static struct bmi088_dev bmi088Dev;
 static struct bmp3_dev   bmp388Dev;
 
 static xQueueHandle accelerometerDataQueue;
+STATIC_MEM_QUEUE_ALLOC(accelerometerDataQueue, 1, sizeof(Axis3f));
 static xQueueHandle gyroDataQueue;
+STATIC_MEM_QUEUE_ALLOC(gyroDataQueue, 1, sizeof(Axis3f));
 static xQueueHandle magnetometerDataQueue;
+STATIC_MEM_QUEUE_ALLOC(magnetometerDataQueue, 1, sizeof(Axis3f));
 static xQueueHandle barometerDataQueue;
+STATIC_MEM_QUEUE_ALLOC(barometerDataQueue, 1, sizeof(baro_t));
+
 static xSemaphoreHandle sensorsDataReady;
+static StaticSemaphore_t sensorsDataReadyBuffer;
 static xSemaphoreHandle dataReady;
+static StaticSemaphore_t dataReadyBuffer;
 
 static bool isInit = false;
 static sensorData_t sensorData;
-static uint64_t imuIntTimestamp;
+static volatile uint64_t imuIntTimestamp;
 
 static Axis3i16 gyroRaw;
 static Axis3i16 accelRaw;
 static BiasObj gyroBiasRunning;
-static Axis3f  gyroBias;
+static Axis3f gyroBias;
 #if defined(SENSORS_GYRO_BIAS_CALCULATE_STDDEV) && defined (GYRO_BIAS_LIGHT_WEIGHT)
-static Axis3f  gyroBiasStdDev;
+static Axis3f gyroBiasStdDev;
 #endif
-static bool    gyroBiasFound = false;
+static bool gyroBiasFound = false;
 static float accScaleSum = 0;
 static float accScale = 1;
+static bool accScaleFound = false;
+static uint32_t accScaleSumCount = 0;
 
 // Low Pass filtering
 #define GYRO_LPF_CUTOFF_FREQ  80
@@ -154,6 +161,8 @@ static void sensorsAddBiasValue(BiasObj* bias, int16_t x, int16_t y, int16_t z);
 static bool sensorsFindBiasValue(BiasObj* bias);
 static void sensorsAccAlignToGravity(Axis3f* in, Axis3f* out);
 
+STATIC_MEM_TASK_ALLOC(sensorsTask, SENSORS_TASK_STACKSIZE);
+
 // Communication routines
 
 /*!
@@ -166,7 +175,7 @@ static void sensorsAccAlignToGravity(Axis3f* in, Axis3f* out);
 static bstdr_ret_t bmi088_burst_read(uint8_t dev_id, uint8_t reg_addr, uint8_t *reg_data, uint16_t len)
 {
   /**< Burst read code comes here */
-  if (i2cdevRead(I2C3_DEV, dev_id, reg_addr, (uint16_t) len, reg_data))
+  if (i2cdevReadReg8(I2C3_DEV, dev_id, reg_addr, (uint16_t) len, reg_data))
   {
     return BSTDR_OK;
   }
@@ -186,7 +195,7 @@ static bstdr_ret_t bmi088_burst_read(uint8_t dev_id, uint8_t reg_addr, uint8_t *
 static bstdr_ret_t bmi088_burst_write(uint8_t dev_id, uint8_t reg_addr, uint8_t *reg_data, uint16_t len)
 {
   /**< Burst write code comes here */
-  if (i2cdevWrite(I2C3_DEV, dev_id,reg_addr,(uint16_t) len, reg_data))
+  if (i2cdevWriteReg8(I2C3_DEV, dev_id,reg_addr,(uint16_t) len, reg_data))
   {
     return BSTDR_OK;
   }
@@ -254,9 +263,6 @@ void sensorsBmi088Bmp388Acquire(sensorData_t *sensors, const uint32_t tick)
   sensorsReadAcc(&sensors->acc);
   sensorsReadMag(&sensors->mag);
   sensorsReadBaro(&sensors->baro);
-  if (!zRangerReadRange(&sensors->zrange, tick)) {
-    zRanger2ReadRange(&sensors->zrange, tick);
-  }
   sensors->interruptTimestamp = sensorData.interruptTimestamp;
 }
 
@@ -502,12 +508,12 @@ static void sensorsDeviceInit(void)
 
 static void sensorsTaskInit(void)
 {
-  accelerometerDataQueue = xQueueCreate(1, sizeof(Axis3f));
-  gyroDataQueue = xQueueCreate(1, sizeof(Axis3f));
-  magnetometerDataQueue = xQueueCreate(1, sizeof(Axis3f));
-  barometerDataQueue = xQueueCreate(1, sizeof(baro_t));
+  accelerometerDataQueue = STATIC_MEM_QUEUE_CREATE(accelerometerDataQueue);
+  gyroDataQueue = STATIC_MEM_QUEUE_CREATE(gyroDataQueue);
+  magnetometerDataQueue = STATIC_MEM_QUEUE_CREATE(magnetometerDataQueue);
+  barometerDataQueue = STATIC_MEM_QUEUE_CREATE(barometerDataQueue);
 
-  xTaskCreate(sensorsTask, SENSORS_TASK_NAME, SENSORS_TASK_STACKSIZE, NULL, SENSORS_TASK_PRI, NULL);
+  STATIC_MEM_TASK_CREATE(sensorsTask, sensorsTask, SENSORS_TASK_NAME, NULL, SENSORS_TASK_PRI);
 }
 
 static void sensorsInterruptInit(void)
@@ -515,8 +521,8 @@ static void sensorsInterruptInit(void)
   GPIO_InitTypeDef GPIO_InitStructure;
   EXTI_InitTypeDef EXTI_InitStructure;
 
-  sensorsDataReady = xSemaphoreCreateBinary();
-  dataReady = xSemaphoreCreateBinary();
+  sensorsDataReady = xSemaphoreCreateBinaryStatic(&sensorsDataReadyBuffer);
+  dataReady = xSemaphoreCreateBinaryStatic(&dataReadyBuffer);
 
   // Enable the interrupt on PC14
   GPIO_InitStructure.GPIO_Pin = GPIO_Pin_14;
@@ -571,10 +577,7 @@ bool sensorsBmi088Bmp388Test(void)
  */
 static bool processAccScale(int16_t ax, int16_t ay, int16_t az)
 {
-  static bool accBiasFound = false;
-  static uint32_t accScaleSumCount = 0;
-
-  if (!accBiasFound)
+  if (!accScaleFound)
   {
     accScaleSum += sqrtf(powf(ax * SENSORS_BMI088_G_PER_LSB_CFG, 2) + powf(ay * SENSORS_BMI088_G_PER_LSB_CFG, 2) + powf(az * SENSORS_BMI088_G_PER_LSB_CFG, 2));
     accScaleSumCount++;
@@ -582,11 +585,11 @@ static bool processAccScale(int16_t ax, int16_t ay, int16_t az)
     if (accScaleSumCount == SENSORS_ACC_SCALE_SAMPLES)
     {
       accScale = accScaleSum / SENSORS_ACC_SCALE_SAMPLES;
-      accBiasFound = true;
+      accScaleFound = true;
     }
   }
 
-  return accBiasFound;
+  return accScaleFound;
 }
 
 #ifdef GYRO_BIAS_LIGHT_WEIGHT

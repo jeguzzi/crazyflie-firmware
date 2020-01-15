@@ -34,6 +34,7 @@
 #include "crtp_commander_high_level.h"
 
 #include "param.h"
+#include "static_mem.h"
 
 static bool isInit;
 const static setpoint_t nullSetpoint;
@@ -42,17 +43,19 @@ const static int priorityDisable = COMMANDER_PRIORITY_DISABLE;
 static uint32_t lastUpdate;
 static bool enableHighLevel = false;
 
-QueueHandle_t setpointQueue;
-QueueHandle_t priorityQueue;
+static QueueHandle_t setpointQueue;
+STATIC_MEM_QUEUE_ALLOC(setpointQueue, 1, sizeof(setpoint_t));
+static QueueHandle_t priorityQueue;
+STATIC_MEM_QUEUE_ALLOC(priorityQueue, 1, sizeof(int));
 
 /* Public functions */
 void commanderInit(void)
 {
-  setpointQueue = xQueueCreate(1, sizeof(setpoint_t));
+  setpointQueue = STATIC_MEM_QUEUE_CREATE(setpointQueue);
   ASSERT(setpointQueue);
   xQueueSend(setpointQueue, &nullSetpoint, 0);
 
-  priorityQueue = xQueueCreate(1, sizeof(int));
+  priorityQueue = STATIC_MEM_QUEUE_CREATE(priorityQueue);
   ASSERT(priorityQueue);
   xQueueSend(priorityQueue, &priorityDisable, 0);
 
@@ -66,7 +69,9 @@ void commanderInit(void)
 void commanderSetSetpoint(setpoint_t *setpoint, int priority)
 {
   int currentPriority;
-  xQueuePeek(priorityQueue, &currentPriority, 0);
+
+  const BaseType_t peekResult = xQueuePeek(priorityQueue, &currentPriority, 0);
+  ASSERT(peekResult == pdTRUE);
 
   if (priority >= currentPriority) {
     setpoint->timestamp = xTaskGetTickCount();
@@ -117,7 +122,10 @@ uint32_t commanderGetInactivityTime(void)
 int commanderGetActivePriority(void)
 {
   int priority;
-  xQueuePeek(priorityQueue, &priority, 0);
+
+  const BaseType_t peekResult = xQueuePeek(priorityQueue, &priority, 0);
+  ASSERT(peekResult == pdTRUE);
+
   return priority;
 }
 

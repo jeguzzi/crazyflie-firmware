@@ -30,7 +30,6 @@
 
 #include "FreeRTOS.h"
 #include "task.h"
-#include "semphr.h"
 
 #include "config.h"
 #include "system.h"
@@ -41,6 +40,7 @@
 #include "commander.h"
 #include "sound.h"
 #include "deck.h"
+#include "static_mem.h"
 
 typedef struct _PmSyslinkInfo
 {
@@ -95,13 +95,15 @@ const static float bat671723HS25C[10] =
   4.10  // 90%
 };
 
+STATIC_MEM_TASK_ALLOC(pmTask, PM_TASK_STACKSIZE);
+
 void pmInit(void)
 {
-  if(isInit)
+  if(isInit) {
     return;
+  }
 
-  xTaskCreate(pmTask, PM_TASK_NAME,
-              PM_TASK_STACKSIZE, NULL, PM_TASK_PRI, NULL);
+  STATIC_MEM_TASK_CREATE(pmTask, pmTask, PM_TASK_NAME, NULL, PM_TASK_PRI);
 
   isInit = true;
 
@@ -277,7 +279,7 @@ bool pmIsDischarging(void) {
 
 void pmTask(void *param)
 {
-  PMStates pmStateOld = shutDown;
+  PMStates pmStateOld = battery;
   uint32_t tickCount;
 
   vTaskSetApplicationTaskTag(0, (void*)TASK_PM_ID_NBR);
@@ -287,7 +289,7 @@ void pmTask(void *param)
   batteryCriticalLowTimeStamp = tickCount;
 
   pmSetChargeState(charge500mA);
-  vTaskDelay(500);
+  systemWaitStart();
 
   while(1)
   {

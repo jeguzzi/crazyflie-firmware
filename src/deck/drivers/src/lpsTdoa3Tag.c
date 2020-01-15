@@ -50,7 +50,7 @@ The implementation must handle
 #include "lpsTdoa3Tag.h"
 #include "tdoaEngine.h"
 #include "tdoaStats.h"
-#include "estimator_kalman.h"
+#include "estimator.h"
 
 #include "libdw1000.h"
 #include "mac.h"
@@ -169,7 +169,7 @@ static void handleLppPacket(const int dataLength, int rangePacketLength, const p
 
 static void rxcallback(dwDevice_t *dev) {
   tdoaStats_t* stats = &engineState.stats;
-  stats->packetsReceived++;
+  STATS_CNT_RATE_EVENT(&stats->packetsReceived);
 
   int dataLength = dwGetDataLength(dev);
   packet_t rxPacket;
@@ -263,7 +263,7 @@ static uint32_t onEvent(dwDevice_t *dev, uwbEvent_t event) {
 }
 
 static void sendTdoaToEstimatorCallback(tdoaMeasurement_t* tdoaMeasurement) {
-  estimatorKalmanEnqueueTDOA(tdoaMeasurement);
+  estimatorEnqueueTDOA(tdoaMeasurement);
 
   #ifdef LPS_2D_POSITION_HEIGHT
   // If LPS_2D_POSITION_HEIGHT is defined we assume that we are doing 2D positioning.
@@ -272,7 +272,7 @@ static void sendTdoaToEstimatorCallback(tdoaMeasurement_t* tdoaMeasurement) {
   heightData.timestamp = xTaskGetTickCount();
   heightData.height = LPS_2D_POSITION_HEIGHT;
   heightData.stdDev = 0.0001;
-  estimatorKalmanEnqueueAsoluteHeight(&heightData);
+  estimatorEnqueueAbsoluteHeight(&heightData);
   #endif
 }
 
@@ -332,15 +332,13 @@ uwbAlgorithm_t uwbTdoa3TagAlgorithm = {
 
 
 LOG_GROUP_START(tdoa3)
-LOG_ADD(LOG_UINT16, stRx, &engineState.stats.packetsReceivedRate)
-LOG_ADD(LOG_UINT16, stEst, &engineState.stats.packetsToEstimatorRate)
-LOG_ADD(LOG_UINT16, stTime, &engineState.stats.timeIsGoodRate)
-LOG_ADD(LOG_UINT16, stFound, &engineState.stats.suitableDataFoundRate)
-
-LOG_ADD(LOG_UINT16, stCc, &engineState.stats.clockCorrectionRate)
-
-LOG_ADD(LOG_UINT16, stHit, &engineState.stats.contextHitRate)
-LOG_ADD(LOG_UINT16, stMiss, &engineState.stats.contextMissRate)
+STATS_CNT_RATE_LOG_ADD(stRx, &engineState.stats.packetsReceived)
+STATS_CNT_RATE_LOG_ADD(stEst, &engineState.stats.packetsToEstimator)
+STATS_CNT_RATE_LOG_ADD(stTime, &engineState.stats.timeIsGood)
+STATS_CNT_RATE_LOG_ADD(stFound, &engineState.stats.suitableDataFound)
+STATS_CNT_RATE_LOG_ADD(stCc, &engineState.stats.clockCorrection)
+STATS_CNT_RATE_LOG_ADD(stHit, &engineState.stats.contextHitCount)
+STATS_CNT_RATE_LOG_ADD(stMiss, &engineState.stats.contextMissCount)
 
 LOG_ADD(LOG_FLOAT, cc, &engineState.stats.clockCorrection)
 LOG_ADD(LOG_UINT16, tof, &engineState.stats.tof)

@@ -1,6 +1,6 @@
 /*
- *    ||          ____  _ __                           
- * +------+      / __ )(_) /_______________ _____  ___ 
+ *    ||          ____  _ __
+ * +------+      / __ )(_) /_______________ _____  ___
  * | 0xBC |     / __  / / __/ ___/ ___/ __ `/_  / / _ \
  * +------+    / /_/ / / /_/ /__/ /  / /_/ / / /_/  __/
  *  ||  ||    /_____/_/\__/\___/_/   \__,_/ /___/\___/
@@ -42,13 +42,16 @@
 #include "configblock.h"
 #include "pm.h"
 #include "ow.h"
+#include "static_mem.h"
 
 static bool isInit = false;
-static uint8_t sendBuffer[64];
+static uint8_t sendBuffer[SYSLINK_MTU + 6];
 
 static void syslinkRouteIncommingPacket(SyslinkPacket *slp);
 
 static xSemaphoreHandle syslinkAccess;
+
+STATIC_MEM_TASK_ALLOC(syslinkTask, SYSLINK_TASK_STACKSIZE);
 
 /* Syslink task, handles communication between nrf and stm and dispatch messages
  */
@@ -91,16 +94,14 @@ static void syslinkRouteIncommingPacket(SyslinkPacket *slp)
 
 void syslinkInit()
 {
-  if(isInit)
+  if(isInit) {
     return;
+  }
 
   vSemaphoreCreateBinary(syslinkAccess);
 
-  if (xTaskCreate(syslinkTask, SYSLINK_TASK_NAME,
-                  SYSLINK_TASK_STACKSIZE, NULL, SYSLINK_TASK_PRI, NULL) == pdPASS)
-  {
-    isInit = true;
-  }
+  STATIC_MEM_TASK_CREATE(syslinkTask, syslinkTask, SYSLINK_TASK_NAME, NULL, SYSLINK_TASK_PRI);
+  isInit = true;
 }
 
 bool syslinkTest()

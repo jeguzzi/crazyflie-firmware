@@ -36,7 +36,7 @@
 
 #include "stabilizer_types.h"
 #include "estimator.h"
-#include "estimator_kalman.h"
+#include "estimator.h"
 
 #include "cf_math.h"
 
@@ -98,7 +98,7 @@ static void flowdeckTask(void *param)
 #if defined(USE_MA_SMOOTHING)
       // Use MA Smoothing
       pixelAverages.averageX[pixelAverages.ptr] = (float32_t)accpx;
-      pixelAverages.averageX[pixelAverages.ptr] = (float32_t)accpy;
+      pixelAverages.averageY[pixelAverages.ptr] = (float32_t)accpy;
 
       float32_t meanX;
       float32_t meanY;
@@ -121,9 +121,9 @@ static void flowdeckTask(void *param)
       flowData.dpixelx = (float)accpx;
       flowData.dpixely = (float)accpy;
 #endif
-      // Push measurements into the Kalman filter
+      // Push measurements into the estimator
       if (!useFlowDisabled) {
-        estimatorKalmanEnqueueFlow(&flowData);
+        estimatorEnqueueFlow(&flowData);
       }
     } else {
       outlierCount++;
