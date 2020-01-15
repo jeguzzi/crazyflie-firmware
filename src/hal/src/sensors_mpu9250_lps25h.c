@@ -7,7 +7,7 @@
  *
  * Crazyflie control firmware
  *
- * Copyright (C) 2011-2016 Bitcraze AB
+ * Copyright (C) 2011-2018 Bitcraze AB
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,12 +21,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
- * sensors_task.h - Sensors interface using an interrupt-driven task to reduce CPU load
+ * Implements HAL for sensors MPU9250 and LPS25H
  *
  * 2016.06.15: Initial version by Mike Hamer, http://mikehamer.info
  */
 
-#include "sensors.h"
+#include "sensors_mpu9250_lps25h.h"
 
 #include <math.h>
 #include <stm32f4xx.h>
@@ -35,6 +35,7 @@
 #include "mpu6500.h"
 #include "ak8963.h"
 #include "zranger.h"
+#include "zranger2.h"
 
 #include "FreeRTOS.h"
 #include "semphr.h"
@@ -43,6 +44,7 @@
 #include "system.h"
 #include "configblock.h"
 #include "param.h"
+#include "log.h"
 #include "debug.h"
 #include "imu.h"
 #include "nvicconf.h"
@@ -57,6 +59,7 @@
 //#define SENSORS_MPU6500_DLPF_256HZ
 
 #define SENSORS_ENABLE_PRESSURE_LPS25H
+//#define GYRO_ADD_RAW_AND_VARIANCE_LOG_VALUES
 
 #define SENSORS_ENABLE_MAG_AK8963
 #define MAG_GAUSS_PER_LSB     666.7f
@@ -94,6 +97,8 @@
 typedef struct
 {
   Axis3f     bias;
+  Axis3f     variance;
+  Axis3f     mean;
   bool       isBiasValueFound;
   bool       isBufferFilled;
   Axis3i16*  bufHead;
@@ -111,6 +116,8 @@ static bool isInit = false;
 static sensorData_t sensorData;
 static uint64_t imuIntTimestamp;
 
+static Axis3i16 gyroRaw;
+static Axis3i16 accelRaw;
 static BiasObj gyroBiasRunning;
 static Axis3f  gyroBias;
 #if defined(SENSORS_GYRO_BIAS_CALCULATE_STDDEV) && defined (GYRO_BIAS_LIGHT_WEIGHT)
@@ -161,37 +168,39 @@ static void sensorsAddBiasValue(BiasObj* bias, int16_t x, int16_t y, int16_t z);
 static bool sensorsFindBiasValue(BiasObj* bias);
 static void sensorsAccAlignToGravity(Axis3f* in, Axis3f* out);
 
-bool sensorsReadGyro(Axis3f *gyro)
+bool sensorsMpu9250Lps25hReadGyro(Axis3f *gyro)
 {
   return (pdTRUE == xQueueReceive(gyroDataQueue, gyro, 0));
 }
 
-bool sensorsReadAcc(Axis3f *acc)
+bool sensorsMpu9250Lps25hReadAcc(Axis3f *acc)
 {
   return (pdTRUE == xQueueReceive(accelerometerDataQueue, acc, 0));
 }
 
-bool sensorsReadMag(Axis3f *mag)
+bool sensorsMpu9250Lps25hReadMag(Axis3f *mag)
 {
   return (pdTRUE == xQueueReceive(magnetometerDataQueue, mag, 0));
 }
 
-bool sensorsReadBaro(baro_t *baro)
+bool sensorsMpu9250Lps25hReadBaro(baro_t *baro)
 {
   return (pdTRUE == xQueueReceive(barometerDataQueue, baro, 0));
 }
 
-void sensorsAcquire(sensorData_t *sensors, const uint32_t tick)
+void sensorsMpu9250Lps25hAcquire(sensorData_t *sensors, const uint32_t tick)
 {
   sensorsReadGyro(&sensors->gyro);
   sensorsReadAcc(&sensors->acc);
   sensorsReadMag(&sensors->mag);
   sensorsReadBaro(&sensors->baro);
-  zRangerReadRange(&sensors->zrange, tick);
+  if (!zRangerReadRange(&sensors->zrange, tick)) {
+    zRanger2ReadRange(&sensors->zrange, tick);
+  }
   sensors->interruptTimestamp = sensorData.interruptTimestamp;
 }
 
-bool sensorsAreCalibrated() {
+bool sensorsMpu9250Lps25hAreCalibrated() {
   return gyroBiasFound;
 }
 
@@ -241,7 +250,7 @@ static void sensorsTask(void *param)
   }
 }
 
-void sensorsWaitDataReady(void)
+void sensorsMpu9250Lps25hWaitDataReady(void)
 {
   xSemaphoreTake(dataReady, portMAX_DELAY);
 }
@@ -282,32 +291,32 @@ void processAccGyroMeasurements(const uint8_t *buffer)
 {
   Axis3f accScaled;
   // Note the ordering to correct the rotated 90º IMU coordinate system
-  int16_t ay = (((int16_t) buffer[0]) << 8) | buffer[1];
-  int16_t ax = (((int16_t) buffer[2]) << 8) | buffer[3];
-  int16_t az = (((int16_t) buffer[4]) << 8) | buffer[5];
-  int16_t gy = (((int16_t) buffer[8]) << 8) | buffer[9];
-  int16_t gx = (((int16_t) buffer[10]) << 8) | buffer[11];
-  int16_t gz = (((int16_t) buffer[12]) << 8) | buffer[13];
+  accelRaw.y = (((int16_t) buffer[0]) << 8) | buffer[1];
+  accelRaw.x = (((int16_t) buffer[2]) << 8) | buffer[3];
+  accelRaw.z = (((int16_t) buffer[4]) << 8) | buffer[5];
+  gyroRaw.y = (((int16_t) buffer[8]) << 8) | buffer[9];
+  gyroRaw.x = (((int16_t) buffer[10]) << 8) | buffer[11];
+  gyroRaw.z = (((int16_t) buffer[12]) << 8) | buffer[13];
 
 
 #ifdef GYRO_BIAS_LIGHT_WEIGHT
-  gyroBiasFound = processGyroBiasNoBuffer(gx, gy, gz, &gyroBias);
+  gyroBiasFound = processGyroBiasNoBuffer(gyroRaw.x, gyroRaw.y, gyroRaw.z, &gyroBias);
 #else
-  gyroBiasFound = processGyroBias(gx, gy, gz, &gyroBias);
+  gyroBiasFound = processGyroBias(gyroRaw.x, gyroRaw.y, gyroRaw.z, &gyroBias);
 #endif
   if (gyroBiasFound)
   {
-     processAccScale(ax, ay, az);
+     processAccScale(accelRaw.x, accelRaw.y, accelRaw.z);
   }
 
-  sensorData.gyro.x = -(gx - gyroBias.x) * SENSORS_DEG_PER_LSB_CFG;
-  sensorData.gyro.y =  (gy - gyroBias.y) * SENSORS_DEG_PER_LSB_CFG;
-  sensorData.gyro.z =  (gz - gyroBias.z) * SENSORS_DEG_PER_LSB_CFG;
+  sensorData.gyro.x = -(gyroRaw.x - gyroBias.x) * SENSORS_DEG_PER_LSB_CFG;
+  sensorData.gyro.y =  (gyroRaw.y - gyroBias.y) * SENSORS_DEG_PER_LSB_CFG;
+  sensorData.gyro.z =  (gyroRaw.z - gyroBias.z) * SENSORS_DEG_PER_LSB_CFG;
   applyAxis3fLpf((lpf2pData*)(&gyroLpf), &sensorData.gyro);
 
-  accScaled.x = -(ax) * SENSORS_G_PER_LSB_CFG / accScale;
-  accScaled.y =  (ay) * SENSORS_G_PER_LSB_CFG / accScale;
-  accScaled.z =  (az) * SENSORS_G_PER_LSB_CFG / accScale;
+  accScaled.x = -(accelRaw.x) * SENSORS_G_PER_LSB_CFG / accScale;
+  accScaled.y =  (accelRaw.y) * SENSORS_G_PER_LSB_CFG / accScale;
+  accScaled.z =  (accelRaw.z) * SENSORS_G_PER_LSB_CFG / accScale;
   sensorsAccAlignToGravity(&accScaled, &sensorData.acc);
   applyAxis3fLpf((lpf2pData*)(&accLpf), &sensorData.acc);
 }
@@ -515,7 +524,7 @@ static void sensorsInterruptInit(void)
   portENABLE_INTERRUPTS();
 }
 
-void sensorsInit(void)
+void sensorsMpu9250Lps25hInit(void)
 {
   if (isInit)
   {
@@ -530,7 +539,7 @@ void sensorsInit(void)
   isInit = true;
 }
 
-bool sensorsTest(void)
+bool sensorsMpu9250Lps25hTest(void)
 {
   bool testStatus = true;
 
@@ -755,20 +764,17 @@ static bool sensorsFindBiasValue(BiasObj* bias)
 
   if (bias->isBufferFilled)
   {
-    Axis3f variance;
-    Axis3f mean;
+    sensorsCalculateVarianceAndMean(bias, &bias->variance, &bias->mean);
 
-    sensorsCalculateVarianceAndMean(bias, &variance, &mean);
-
-    if (variance.x < GYRO_VARIANCE_THRESHOLD_X &&
-        variance.y < GYRO_VARIANCE_THRESHOLD_Y &&
-        variance.z < GYRO_VARIANCE_THRESHOLD_Z &&
+    if (bias->variance.x < GYRO_VARIANCE_THRESHOLD_X &&
+        bias->variance.y < GYRO_VARIANCE_THRESHOLD_Y &&
+        bias->variance.z < GYRO_VARIANCE_THRESHOLD_Z &&
         (varianceSampleTime + GYRO_MIN_BIAS_TIMEOUT_MS < xTaskGetTickCount()))
     {
       varianceSampleTime = xTaskGetTickCount();
-      bias->bias.x = mean.x;
-      bias->bias.y = mean.y;
-      bias->bias.z = mean.z;
+      bias->bias.x = bias->mean.x;
+      bias->bias.y = bias->mean.y;
+      bias->bias.z = bias->mean.z;
       foundBias = true;
       bias->isBiasValueFound = true;
     }
@@ -777,7 +783,7 @@ static bool sensorsFindBiasValue(BiasObj* bias)
   return foundBias;
 }
 
-bool sensorsManufacturingTest(void)
+bool sensorsMpu9250Lps25hManufacturingTest(void)
 {
   bool testStatus = false;
   Axis3i16 g;
@@ -871,12 +877,45 @@ static void sensorsAccAlignToGravity(Axis3f* in, Axis3f* out)
   out->z = ry.z;
 }
 
+void sensorsMpu9250Lps25hSetAccMode(accModes accMode)
+{
+  switch (accMode)
+  {
+    case ACC_MODE_PROPTEST:
+      mpu6500SetAccelDLPF(MPU6500_ACCEL_DLPF_BW_460);
+      for (uint8_t i = 0; i < 3; i++)
+      {
+        lpf2pInit(&accLpf[i],  1000, 500);
+      }
+      break;
+    case ACC_MODE_FLIGHT:
+    default:
+      mpu6500SetAccelDLPF(MPU6500_ACCEL_DLPF_BW_41);
+      for (uint8_t i = 0; i < 3; i++)
+      {
+        lpf2pInit(&accLpf[i],  1000, ACCEL_LPF_CUTOFF_FREQ);
+      }
+      break;
+  }
+}
+
 static void applyAxis3fLpf(lpf2pData *data, Axis3f* in)
 {
   for (uint8_t i = 0; i < 3; i++) {
     in->axis[i] = lpf2pApply(&data[i], in->axis[i]);
   }
 }
+
+#ifdef GYRO_ADD_RAW_AND_VARIANCE_LOG_VALUES
+LOG_GROUP_START(gyro)
+LOG_ADD(LOG_INT16, xRaw, &gyroRaw.x)
+LOG_ADD(LOG_INT16, yRaw, &gyroRaw.y)
+LOG_ADD(LOG_INT16, zRaw, &gyroRaw.z)
+LOG_ADD(LOG_FLOAT, xVariance, &gyroBiasRunning.variance.x)
+LOG_ADD(LOG_FLOAT, yVariance, &gyroBiasRunning.variance.y)
+LOG_ADD(LOG_FLOAT, zVariance, &gyroBiasRunning.variance.z)
+LOG_GROUP_STOP(gyro)
+#endif
 
 PARAM_GROUP_START(imu_sensors)
 PARAM_ADD(PARAM_UINT8 | PARAM_RONLY, HMC5883L, &isMagnetometerPresent)
