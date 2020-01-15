@@ -45,6 +45,7 @@ enum trajectory_state
 {
 	TRAJECTORY_STATE_IDLE            = 0,
 	TRAJECTORY_STATE_FLYING          = 1,
+	TRAJECTORY_STATE_HOVERING        = 2,
 	TRAJECTORY_STATE_LANDING         = 3,
 };
 

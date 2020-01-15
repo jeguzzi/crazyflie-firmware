@@ -76,22 +76,27 @@ bool plan_is_stopped(struct planner *p)
 struct traj_eval plan_current_goal(struct planner *p, float t)
 {
 	switch (p->state) {
+		case TRAJECTORY_STATE_FLYING:
+			if (piecewise_is_finished(p->trajectory, t)) {
+					p->state = TRAJECTORY_STATE_HOVERING;
+			}
+			break;
 		case TRAJECTORY_STATE_LANDING:
 			if (piecewise_is_finished(p->trajectory, t)) {
 				p->state = TRAJECTORY_STATE_IDLE;
 			}
-			// intentional fall-thru
-		case TRAJECTORY_STATE_FLYING:
-			if (p->reversed) {
+			break;
+		default:
+			break;
+		}
+		if (p->state == TRAJECTORY_STATE_IDLE)
+		{
+			return traj_eval_invalid();
+		}
+		if (p->reversed) {
 				return piecewise_eval_reversed(p->trajectory, t);
 			}
-			else {
-				return piecewise_eval(p->trajectory, t);
-			}
-
-		default:
-			return traj_eval_invalid();
-	}
+		return piecewise_eval(p->trajectory, t);
 }
 
 
