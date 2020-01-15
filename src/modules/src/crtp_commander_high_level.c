@@ -395,3 +395,12 @@ int define_trajectory(const struct data_define_trajectory* data)
   trajectory_descriptions[data->trajectoryId] = data->description;
   return 0;
 }
+
+
+LOG_GROUP_START(highlevel)
+LOG_ADD(LOG_UINT8, state, &planner.state)
+LOG_ADD(LOG_FLOAT, x, &pos.x)
+LOG_ADD(LOG_FLOAT, y, &pos.y)
+LOG_ADD(LOG_FLOAT, z, &pos.z)
+
+LOG_GROUP_STOP(highlevel)
