@@ -19,3 +19,6 @@ tags
 /generated-test/**
 
 current_platform.mk
+
+*.zip
+*.log
