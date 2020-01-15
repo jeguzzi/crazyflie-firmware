@@ -91,11 +91,6 @@ bool plan_is_stopped(struct planner *p)
 struct traj_eval plan_current_goal(struct planner *p, float t)
 {
 	switch (p->state) {
-		case TRAJECTORY_STATE_FLYING:
-			if (piecewise_is_finished(p->trajectory, t)) {
-					p->state = TRAJECTORY_STATE_HOVERING;
-			}
-			break;
 		case TRAJECTORY_STATE_LANDING:
 			if (plan_is_finished(p, t)) {
 				p->state = TRAJECTORY_STATE_IDLE;
