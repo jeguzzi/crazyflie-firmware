@@ -194,6 +194,8 @@ PROJ_OBJ += deck_analog.o
 PROJ_OBJ += deck_spi.o
 
 # Decks
+# ETH pulp shield
+PROJ_OBJ += pulp_shield.o
 
 ifeq ($(LEDRING_IS_ABOVE), 1)
 PROJ_OBJ += ledring12_UP.o

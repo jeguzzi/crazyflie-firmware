@@ -41,10 +41,14 @@
  * Initialize the SPI.
  */
 void spiBegin(void);
+void spiBeginSlave(void);
 void spiBeginTransaction(uint16_t baudRatePrescaler);
+void spiBeginTransactionSlave(uint16_t baudRatePrescaler);
 void spiEndTransaction();
+void spiEndTransactionSlave();
 
 /* Send the data_tx buffer and receive into the data_rx buffer */
 bool spiExchange(size_t length, const uint8_t *data_tx, uint8_t *data_rx);
+bool spiExchangeSlave(size_t length, const uint8_t * data_tx, uint8_t * data_rx);
 
 #endif /* SPI_H_ */

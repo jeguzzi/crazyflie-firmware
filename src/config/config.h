@@ -55,7 +55,7 @@
   #define MCU_ID_ADDRESS          0x1FFF7A10
   #define MCU_FLASH_SIZE_ADDRESS  0x1FFF7A22
   #ifndef FREERTOS_HEAP_SIZE
-    #define FREERTOS_HEAP_SIZE      15000
+    #define FREERTOS_HEAP_SIZE      40000
   #endif
   #define FREERTOS_MIN_STACK_SIZE 150       // M4-FPU register setup is bigger so stack needs to be bigger
   #define FREERTOS_MCU_CLOCK_HZ   168000000
@@ -100,6 +100,8 @@
 #define USBLINK_TASK_PRI        3
 #define ACTIVE_MARKER_TASK_PRI  3
 
+#define PULP_SHIELD_TASK_PRI    1
+
 // Not compiled
 #if 0
   #define INFO_TASK_PRI           2
@@ -143,6 +145,7 @@
 #define UART2_TEST_TASK_NAME    "UART2TEST"
 #define KALMAN_TASK_NAME        "KALMAN"
 #define ACTIVE_MARKER_TASK_NAME "ACTIVEMARKER-DECK"
+#define PULP_SHIELD_TASK_NAME   "PULP-SHIELD"
 
 //Task stack sizes
 #define SYSTEM_TASK_STACKSIZE         (2* configMINIMAL_STACK_SIZE)
@@ -172,6 +175,7 @@
 #define CMD_HIGH_LEVEL_TASK_STACKSIZE (2 * configMINIMAL_STACK_SIZE)
 #define MULTIRANGER_TASK_STACKSIZE    (2 * configMINIMAL_STACK_SIZE)
 #define ACTIVEMARKER_TASK_STACKSIZE   configMINIMAL_STACK_SIZE
+#define PULP_SHIELD_TASK_STACKSIZE    (3 * configMINIMAL_STACK_SIZE)
 
 //The radio channel. From 0 to 125
 #define RADIO_CHANNEL 80
