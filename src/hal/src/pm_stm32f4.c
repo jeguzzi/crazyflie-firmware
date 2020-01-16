@@ -279,7 +279,7 @@ bool pmIsDischarging(void) {
 
 void pmTask(void *param)
 {
-  PMStates pmStateOld = battery;
+  PMStates pmStateOld = unknown;
   uint32_t tickCount;
 
   vTaskSetApplicationTaskTag(0, (void*)TASK_PM_ID_NBR);
