@@ -31,8 +31,8 @@ static float phi_;
 
 static uint32_t step, lastUpdate, sleep;
 static bool isInit          = false;
-static bool isEnabled         = false;
-
+static bool isEnabled       = false;
+static bool enable         = true;
 
 // setpoint_t PULPShieldGetSetpoint() {
 //   return setpoint_;
@@ -68,6 +68,8 @@ void PULPShieldOn() {
 
   // Enable must be set last
   isEnabled = true;
+
+  DEBUG_PRINT("PULP-Shield is on\n");
 }
 
 
@@ -84,6 +86,8 @@ void PULPShieldOff() {
 
   // Reset task's step counter
   step = 1;
+
+  DEBUG_PRINT("PULP-Shield is off\n");
 }
 
 
@@ -127,16 +131,21 @@ void getPULPOutputs() {
   uint8_t data_rx[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
   uint8_t data_tx[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
+  // DEBUG_PRINT("getPULPOutputs\n");
+
   spiBeginTransactionSlave(SPI_BAUDRATE_2MHZ);
   spiExchangeSlave(8, data_tx, data_rx);
   spiEndTransactionSlave();
 
-  x_     = fixed2float((int16_t*)&data_rx[0]);
+  // DEBUG_PRINT("DATA RX: 0x%x 0x%x, 0x%x 0x%x, 0x%x 0x%x, 0x%x 0x%x \n",
+  // data_rx[0], data_rx[1], data_rx[2], data_rx[3], data_rx[4], data_rx[5], data_rx[6], data_rx[7]);
+
+  x_    = fixed2float((int16_t*)&data_rx[0]);
   y_    = fixed2float((int16_t*)&data_rx[2]);
   z_    = fixed2float((int16_t*)&data_rx[4]);
   phi_  = fixed2float((int16_t*)&data_rx[6]);
 
-  DEBUG_PRINT("FRONTNET: %f %f %f %f\n", (double)x_, (double)y_, (double)z_, (double)phi_);
+  // DEBUG_PRINT("FRONTNET: %f %f %f %f\n", (double)x_, (double)y_, (double)z_, (double)phi_);
 }
 
 float fixed2float(int16_t *x) {
@@ -160,20 +169,33 @@ static void PULPShieldTask(void *param) {
 
   while(1) {
 
+    // DEBUG_PRINT("PULPShieldTask %d\n", isEnabled);
       uint32_t currentTime = xTaskGetTickCount();
     /**** INITIAL TIMER ****/
       if(currentTime-sleep<SLEEP_THRESHOLD) {
+        // DEBUG_PRINT("PULPShieldTask -> sleep %ld %ld %d\n", currentTime, sleep, SLEEP_THRESHOLD);
         lastUpdate = xTaskGetTickCount();
         vTaskDelay(200);
       }
       else {
       if(isEnabled) {
-        if((currentTime-lastUpdate) > PULP_NAVIGATE_RATE) {
+        if(!enable)
+        {
+          PULPShieldOff();
+          continue;
+        }
+        // if((currentTime-lastUpdate) > PULP_NAVIGATE_RATE) {
+          // DEBUG_PRINT("will getPULPOutputs\n");
           getPULPOutputs();
+          // DEBUG_PRINT("has getPULPOutputs\n");
           lastUpdate = xTaskGetTickCount();
           step++;
-        }
+        // }
       } else {
+        if(enable)
+        {
+          PULPShieldOn();
+        }
         vTaskDelay(200);
       }
       }
@@ -186,6 +208,13 @@ static void PULPShieldInit() {
 
   if(isInit) return;
 
+  // GPIOInit();
+  // GPIOOn();
+  // PULPShieldOn();
+  // isInit = true;
+  //
+  // return;
+
   xTaskCreate(PULPShieldTask,        // pointer to the task entry function
         PULP_SHIELD_TASK_NAME,    // name for the task
         PULP_SHIELD_TASK_STACKSIZE,  // number of words for task's stack
@@ -195,8 +224,9 @@ static void PULPShieldInit() {
 
   GPIOInit();
   // GPIOOff();
-  PULPShieldOn();
+  if(enable) PULPShieldOn();
 
+  // GPIOOn();
   isInit = true;
 
   DEBUG_PRINT("PULP-Shield Initialized\n");
@@ -211,6 +241,9 @@ static const DeckDriver PULPShieldDriver = {
 
 DECK_DRIVER(PULPShieldDriver);
 
+PARAM_GROUP_START(pulp)
+PARAM_ADD(PARAM_UINT8, enable, &enable)
+PARAM_GROUP_STOP(pulp)
 
 LOG_GROUP_START(frontnet)
 LOG_ADD(LOG_FLOAT, x, &x_)

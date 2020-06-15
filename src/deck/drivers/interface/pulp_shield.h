@@ -37,7 +37,8 @@
 #define WATCH_DOG_EN
 
 #define PULP_TARGET_H		1.50f
-#define SLEEP_THRESHOLD		20000
+#define SLEEP_THRESHOLD		20000  // would sleep seconds
+// #define SLEEP_THRESHOLD		2000  // would sleep seconds
 #define ERROR_THRESHOLD		750
 
 #define PULP_TAKEOFF_RATE	10
