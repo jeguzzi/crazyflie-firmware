@@ -17,18 +17,14 @@ tags
 /tag.*
 *.gch
 
-/generated-test/**
-**/__pycache__/**
-
 current_platform.mk
 
 *.zip
 *.log
-=======
-# generated files for githubpages
 /docs/_site/*
 /docs/Gemfile.lock
-
+/generated-test/**
+**/__pycache__/**
 
 /docs/.jekyll-metadata
 docs/.jekyll-cache
