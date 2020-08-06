@@ -12,12 +12,12 @@
 #include "math3d.h"
 #include "aideck_protocol.h"
 
-// Uncomment to log the kalman state and the control
-// #define LOG_INTERNAL_STATE
+// Uncomment to log the kalman state
+// #define LOG_FILTERED_ODOM
 // The setpoint priority.
 // If larger than COMMANDER_PRIORITY_CRTP = 1, our control setpoint will have priority
 // over external [crtp] setpoints)
-#define SETPOINT_PRIORITY (COMMANDER_PRIORITY_CRTP + 0)
+#define SETPOINT_PRIORITY (COMMANDER_PRIORITY_CRTP + 1)
 
 // helper function
 
@@ -228,17 +228,14 @@ LOG_ADD(LOG_FLOAT, z, &z_)
 LOG_ADD(LOG_FLOAT, phi, &phi_)
 LOG_ADD(LOG_UINT32, lastUpdate, &lastUpdate)
 LOG_ADD(LOG_UINT8, control_active, &control_active)
-#ifdef LOG_INTERNAL_STATE
+#ifdef LOG_FILTERED_ODOM
 LOG_ADD(LOG_FLOAT, f_x, &x_odom.state.x)
 LOG_ADD(LOG_FLOAT, f_y, &y_odom.state.x)
 LOG_ADD(LOG_FLOAT, f_z, &z_odom.state.x)
 LOG_ADD(LOG_FLOAT, f_phi, &phi_odom.state.x)
 LOG_ADD(LOG_FLOAT, f_vx, &x_odom.state.v)
 LOG_ADD(LOG_FLOAT, f_vy, &y_odom.state.v)
-LOG_ADD(LOG_FLOAT, f_z, &z_odom.state.x)
+LOG_ADD(LOG_FLOAT, f_vz, &z_odom.state.x)
 LOG_ADD(LOG_FLOAT, f_vphi, &phi_odom.state.v)
-LOG_ADD(LOG_FLOAT, c_x, &setpoint.velocity.x)
-LOG_ADD(LOG_FLOAT, c_y, &setpoint.velocity.y)
-LOG_ADD(LOG_FLOAT, c_phi, &setpoint.attitudeRate.yaw)
-#endif // LOG_INTERNAL_STATE
+#endif // LOG_FILTERED_ODOM
 LOG_GROUP_STOP(frontnet)
