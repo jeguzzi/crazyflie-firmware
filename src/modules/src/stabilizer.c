@@ -64,8 +64,15 @@ uint32_t inToOutLatency;
 // State variables for the stabilizer
 static setpoint_t setpoint;
 static sensorData_t sensorData;
+
 static state_t state;
 static control_t control;
+
+// CHANGED J: can I get the state without changing this file?
+
+state_t * get_state(){
+  return &state;
+}
 
 static StateEstimatorType estimatorType;
 static ControllerType controllerType;
@@ -643,9 +650,9 @@ LOG_ADD(LOG_FLOAT, vx, &state.velocity.x)
 LOG_ADD(LOG_FLOAT, vy, &state.velocity.y)
 LOG_ADD(LOG_FLOAT, vz, &state.velocity.z)
 
-LOG_ADD(LOG_FLOAT, vx, &state.velocity.x)
-LOG_ADD(LOG_FLOAT, vy, &state.velocity.y)
-LOG_ADD(LOG_FLOAT, vz, &state.velocity.z)
+// LOG_ADD(LOG_FLOAT, vx, &state.velocity.x)
+// LOG_ADD(LOG_FLOAT, vy, &state.velocity.y)
+// LOG_ADD(LOG_FLOAT, vz, &state.velocity.z)
 
 LOG_ADD(LOG_FLOAT, ax, &state.acc.x)
 LOG_ADD(LOG_FLOAT, ay, &state.acc.y)

@@ -1,27 +1,5 @@
 /*
- *    ||          ____  _ __
- * +------+      / __ )(_) /_______________ _____  ___
- * | 0xBC |     / __  / / __/ ___/ ___/ __ `/_  / / _ \
- * +------+    / /_/ / / /_/ /__/ /  / /_/ / / /_/  __/
- *  ||  ||    /_____/_/\__/\___/_/   \__,_/ /___/\___/
- *
- * Crazyflie control firmware
- *
- * Copyright (C) 2011-2012 Bitcraze AB
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, in version 3.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
- *
- * aideck.c - Deck driver for the AIdeck
+This file is an extension of the original example provided by Bitcraze
  */
 #define DEBUG_MODULE "AIDECK"
 
@@ -46,12 +24,24 @@
 #include "system.h"
 #include "uart1.h"
 #include "uart2.h"
+#include "timers.h"
+#include "worker.h"
+
+// Include the autogenerate code implementing the protocol
+#include "aideck_protocol.c"
+
+#ifdef AIDECK_HAS_CONFIGS
+static xTimerHandle timer;
+static void configTimer(xTimerHandle timer)
+{
+  workerSchedule(update_config, NULL);
+}
+#endif
 
 static bool isInit = false;
-static uint8_t byte;
 
-//Uncomment when NINA printout read is desired from console
-//#define DEBUG_NINA_PRINT
+// Uncomment when NINA printout read is desired from console
+// #define DEBUG_NINA_PRINT
 
 #ifdef DEBUG_NINA_PRINT
 static void NinaTask(void *param)
@@ -76,9 +66,95 @@ static void NinaTask(void *param)
         {
             consolePutchar(byte);
         }
+        // if(in_byte != old_byte)
+        // {
+        //   old_byte = in_byte;
+        //   uart2SendData(1, &old_byte);
+        // }
     }
 }
 #endif
+
+// Read n bytes from UART, returning the read size before ev. timing out.
+static int read_uart_bytes(int size, uint8_t *buffer)
+{
+  uint8_t *byte = buffer;
+  for (int i = 0; i < size; i++) {
+    if(uart1GetDataWithTimout(byte))
+    {
+      byte++;
+    }
+    else
+    {
+      return i;
+    }
+  }
+  return size;
+}
+
+// Read UART 1 while looking for structured messages.
+// When none are found, print everything to console.
+static uint8_t header_buffer[HEADER_LENGTH];
+static uint8_t buffer[100];
+static void read_uart_message()
+{
+  uint8_t *byte = header_buffer;
+  int n = 0;
+  input_t *input;
+  input_t *begin = (input_t *) inputs;
+  input_t *end = begin + INPUT_NUMBER;
+  for (input = begin; input < end; input++) input->valid = 1;
+  while(n < HEADER_LENGTH)
+  {
+    if(uart1GetDataWithTimout(byte))
+    {
+      int valid = 0;
+      for (input = begin; input < end; input++) {
+        if(!(input->valid)) continue;
+        if(*byte != (input->header)[n]){
+          input->valid = 0;
+        }
+        else{
+          valid = 1;
+        }
+      }
+      n++;
+      if(valid)
+      {
+        // Keep reading
+        byte++;
+        continue;
+      }
+    }
+
+    // forward to console and return;
+    for (size_t i = 0; i < n; i++) {
+      consolePutchar(header_buffer[i]);
+    }
+    return;
+  }
+  // Found message
+  for (input = begin; input < end; input++)
+  {
+    if(input->valid) break;
+  }
+  // uint8_t buffer[input->size];
+  int size = read_uart_bytes(input->size, buffer);
+  if( size == input->size )
+  {
+    // DEBUG_PRINT("Should call callback for msg %4s of size %d\n", input->header, size);
+    // for (size_t i = 0; i < size; i++) {
+    //   DEBUG_PRINT("0x%02x\n", buffer[i]);
+    // }
+    // Call the corresponding callback
+    workerSchedule(input->callback, buffer);
+    // input->callback(buffer);
+  }
+  else{
+    DEBUG_PRINT("Failed to receive message %4s: (%d vs %d bytes received)\n",
+                 input->header, size, input->size);
+  }
+}
 
 static void Gap8Task(void *param)
 {
@@ -91,17 +167,15 @@ static void Gap8Task(void *param)
     vTaskDelay(10);
     digitalWrite(DECK_GPIO_IO4, HIGH);
     pinMode(DECK_GPIO_IO4, INPUT_PULLUP);
-
-    // Read out the byte the Gap8 sends and immediately send it to the console.
+    DEBUG_PRINT("Starting UART listener\n");
     while (1)
     {
-        uart1GetDataWithTimout(&byte);
+        read_uart_message();
     }
 }
 
 static void aideckInit(DeckInfo *info)
 {
-
     if (isInit)
         return;
 
@@ -117,15 +191,16 @@ static void aideckInit(DeckInfo *info)
     // Initialize task for the NINA
     xTaskCreate(NinaTask, AI_DECK_NINA_TASK_NAME, AI_DECK_TASK_STACKSIZE, NULL,
                 AI_DECK_TASK_PRI, NULL);
-
 #endif
-
-    isInit = true;
+#ifdef AIDECK_HAS_CONFIGS
+  timer = xTimerCreate( "configTimer", M2T(1000), pdTRUE, NULL, configTimer );
+  xTimerStart(timer, 1000);
+#endif
+  isInit = true;
 }
 
 static bool aideckTest()
 {
-
     return true;
 }
 
@@ -141,9 +216,6 @@ static const DeckDriver aideck_deck = {
     .test = aideckTest,
 };
 
-LOG_GROUP_START(aideck)
-LOG_ADD(LOG_UINT8, receivebyte, &byte)
-LOG_GROUP_STOP(aideck)
 
 PARAM_GROUP_START(deck)
 PARAM_ADD(PARAM_UINT8 | PARAM_RONLY, bcAIDeck, &isInit)
