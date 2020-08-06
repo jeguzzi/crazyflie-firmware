@@ -42,6 +42,10 @@ static float eta = 1.0f;
 static float maximal_speed = 1.0f;
 static float maximal_angular_speed = 1.0f;
 static float maximal_vertical_speed = 0.5f;
+#define FREQ_STEPS 10
+static uint32_t number_of_updates = 0;
+static uint8_t update_hz = 0;
+static uint32_t prevUpdate = 0;
 static setpoint_t setpoint = {.mode.x = modeVelocity, .mode.y = modeVelocity,
                               .mode.z = modeVelocity, .mode.yaw = modeVelocity,
                               .velocity_body=false};
@@ -186,6 +190,17 @@ void inference_output_callback(inference_output_t *value) {
   update_kalman(&z_odom, dt, pose.position.z);
   update_kalman(&phi_odom, dt, pose.attitude.yaw);
   pose = target_pose(&state);
+  number_of_updates++;
+#if defined(FREQ_STEPS) && FREQ_STEPS > 0
+  if(number_of_updates % FREQ_STEPS == 0) {
+    if(prevUpdate){
+      update_hz = 1000 * FREQ_STEPS / T2M(lastUpdate - prevUpdate);
+    }
+    prevUpdate = lastUpdate;
+    number_of_updates = 0;
+  }
+#endif
+
   if(!should_control) {
     control_active = false;
     return;
@@ -228,6 +243,7 @@ LOG_ADD(LOG_FLOAT, z, &z_)
 LOG_ADD(LOG_FLOAT, phi, &phi_)
 LOG_ADD(LOG_UINT32, lastUpdate, &lastUpdate)
 LOG_ADD(LOG_UINT8, control_active, &control_active)
+LOG_ADD(LOG_UINT8, update_frequency, &update_hz)
 #ifdef LOG_FILTERED_ODOM
 LOG_ADD(LOG_FLOAT, f_x, &x_odom.state.x)
 LOG_ADD(LOG_FLOAT, f_y, &y_odom.state.x)
