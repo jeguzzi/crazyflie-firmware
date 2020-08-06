@@ -10,8 +10,8 @@ CRAZYFLIE_BASE ?= ./
 -include tools/make/config.mk
 
 CFLAGS += $(EXTRA_CFLAGS)
-# Hack(Jerome): The ROS bridge has issues with too large LOG TOG.
-# Some we remove some we are not using.
+# Hack(Jerome): The ROS bridge has issues with too large LOG TOG,
+# so we remove some we are not using.
 CFLAGS += -DREDUCED_LOG_TOC
 
 ######### JTAG and environment configuration ##########
