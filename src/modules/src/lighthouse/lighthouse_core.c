@@ -330,6 +330,7 @@ void lighthouseCoreTask(void *param) {
   }
 }
 
+#ifndef REDUCED_LOG_TOC
 LOG_GROUP_START(lighthouse)
 LOG_ADD(LOG_FLOAT, rawAngle0x, &angles.sensorMeasurementsLh1[0].baseStatonMeasurements[0].angles[0])
 LOG_ADD(LOG_FLOAT, rawAngle0y, &angles.sensorMeasurementsLh1[0].baseStatonMeasurements[0].angles[1])
@@ -374,6 +375,7 @@ LOG_ADD(LOG_UINT16, width3, &pulseWidth[3])
 
 LOG_ADD(LOG_UINT8, comSync, &uartSynchronized)
 LOG_GROUP_STOP(lighthouse)
+#endif
 
 PARAM_GROUP_START(lighthouse)
 PARAM_ADD(PARAM_UINT8, method, &estimationMethod)

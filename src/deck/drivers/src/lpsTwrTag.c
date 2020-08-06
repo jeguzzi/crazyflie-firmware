@@ -552,6 +552,7 @@ uwbAlgorithm_t uwbTwrTagAlgorithm = {
   .getActiveAnchorIdList = getActiveAnchorIdList,
 };
 
+#ifndef REDUCED_LOG_TOC
 LOG_GROUP_START(twr)
 LOG_ADD(LOG_UINT8, rangingSuccessRate0, &rangingSuccessRate[0])
 LOG_ADD(LOG_UINT8, rangingPerSec0, &rangingPerSec[0])
@@ -617,3 +618,4 @@ LOG_ADD(LOG_FLOAT, pressure6, &state.pressures[6])
 LOG_ADD(LOG_FLOAT, pressure7, &state.pressures[7])
 #endif
 LOG_GROUP_STOP(ranging)
+#endif

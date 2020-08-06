@@ -516,6 +516,7 @@ PARAM_GROUP_START(deck)
 PARAM_ADD(PARAM_UINT8 | PARAM_RONLY, bcDWM1000, &isInit)
 PARAM_GROUP_STOP(deck)
 
+#ifndef REDUCED_LOG_TOC
 LOG_GROUP_START(ranging)
 LOG_ADD(LOG_UINT16, state, &algoOptions.rangingState)
 LOG_GROUP_STOP(ranging)
@@ -523,6 +524,7 @@ LOG_GROUP_STOP(ranging)
 LOG_GROUP_START(loco)
 LOG_ADD(LOG_UINT8, mode, &algoOptions.currentRangingMode)
 LOG_GROUP_STOP(loco)
+#endif
 
 PARAM_GROUP_START(loco)
 PARAM_ADD(PARAM_UINT8, mode, &algoOptions.userRequestedMode)

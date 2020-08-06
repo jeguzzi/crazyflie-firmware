@@ -10,6 +10,9 @@ CRAZYFLIE_BASE ?= ./
 -include tools/make/config.mk
 
 CFLAGS += $(EXTRA_CFLAGS)
+# Hack(Jerome): The ROS bridge has issues with too large LOG TOG.
+# Some we remove some we are not using.
+CFLAGS += -DREDUCED_LOG_TOC
 
 ######### JTAG and environment configuration ##########
 OPENOCD           ?= openocd
@@ -202,7 +205,7 @@ PROJ_OBJ += deck_spi3.o
 
 # Decks
 # ETH pulp shield
-PROJ_OBJ += pulp_shield.o
+# PROJ_OBJ += pulp_shield.o
 
 ifeq ($(LEDRING_IS_ABOVE), 1)
 PROJ_OBJ += ledring12_UP.o
@@ -237,6 +240,8 @@ CFLAGS += -DUART2_LINK_COMM
 else
 PROJ_OBJ += aideck.o
 endif
+
+PROJ_OBJ += frontnet.o
 
 ifeq ($(LPS_TDOA_ENABLE), 1)
 CFLAGS += -DLPS_TDOA_ENABLE

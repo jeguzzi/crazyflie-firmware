@@ -316,6 +316,7 @@ PARAM_GROUP_START(deck)
 PARAM_ADD(PARAM_UINT8 | PARAM_RONLY, bcGTGPS, &isInit)
 PARAM_GROUP_STOP(deck)
 
+#ifndef REDUCED_LOG_TOC
 LOG_GROUP_START(gps)
 LOG_ADD(LOG_INT32, lat, &m.latitude)
 LOG_ADD(LOG_INT32, lon, &m.longitude)
@@ -324,3 +325,4 @@ LOG_ADD(LOG_FLOAT, hAcc, &b.pdop)
 LOG_ADD(LOG_INT32, nsat, &m.nsat)
 LOG_ADD(LOG_INT32, fix, &b.fix)
 LOG_GROUP_STOP(gps)
+#endif

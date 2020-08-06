@@ -299,6 +299,7 @@ void lighthousePositionEstimatePoseSweeps(pulseProcessorResult_t* angles, int ba
   estimateYaw(angles, baseStation);
 }
 
+#ifndef REDUCED_LOG_TOC
 LOG_GROUP_START(lighthouse)
 STATS_CNT_RATE_LOG_ADD(posRt, &positionRate)
 STATS_CNT_RATE_LOG_ADD(estBs0Rt, &estBs0Rate)
@@ -310,6 +311,7 @@ LOG_ADD(LOG_FLOAT, z, &position[2])
 
 LOG_ADD(LOG_FLOAT, delta, &deltaLog)
 LOG_GROUP_STOP(lighthouse)
+#endif
 
 PARAM_GROUP_START(lighthouse)
 PARAM_ADD(PARAM_FLOAT, sweepStd, &sweepStd)

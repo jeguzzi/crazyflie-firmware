@@ -17,9 +17,9 @@
  * This control algorithm is the Incremental Nonlinear Dynamic Inversion (INDI)
  * controller to control the position of the Crazyflie. It can be seen as an extension
  * (outer loop) to the already existing INDI attitude controller (inner loop).
- * 
+ *
  * The control algorithm was implemented according to the publication in the
- * journal od Control Engineering Practice: Cascaded Incremental Nonlinear Dynamic 
+ * journal od Control Engineering Practice: Cascaded Incremental Nonlinear Dynamic
  * Inversion for MAV Disturbance Rejection
  * https://doi.org/10.1016/j.conengprac.2018.01.003
  */
@@ -44,7 +44,7 @@ static float velS_x, velS_y, velS_z;			// Current velocity
 static float gyr_p, gyr_q, gyr_r;				// Current rates
 
 // Reference values
-static struct Vectr positionRef; 
+static struct Vectr positionRef;
 static struct Vectr velocityRef;
 
 
@@ -60,7 +60,7 @@ void position_indi_init_filters(void)
 	float tau = 1.0f / (2.0f * M_PI_F * indiOuter.filt_cutoff);
 	float tau_axis[3] = {tau, tau, tau};
 	float sample_time = 1.0f / ATTITUDE_RATE;
-	// Filtering of linear acceleration, attitude and thrust 
+	// Filtering of linear acceleration, attitude and thrust
 	for (int8_t i = 0; i < 3; i++) {
 		init_butterworth_2_low_pass(&indiOuter.ddxi[i], tau_axis[i], sample_time, 0.0f);
 		init_butterworth_2_low_pass(&indiOuter.ang[i], tau_axis[i], sample_time, 0.0f);
@@ -85,7 +85,7 @@ static inline void filter_ang(Butterworth2LowPass *filter, struct Angles *old_va
 }
 
 // Thrust filter
-static inline void filter_thrust(Butterworth2LowPass *filter, float *old_thrust, float *new_thrust) 
+static inline void filter_thrust(Butterworth2LowPass *filter, float *old_thrust, float *new_thrust)
 {
 	*new_thrust = update_butterworth_2_low_pass(&filter[0], *old_thrust);
 }
@@ -95,7 +95,7 @@ static inline void filter_thrust(Butterworth2LowPass *filter, float *old_thrust,
 void m_ob(struct Angles att, float matrix[3][3]) {
 
 	matrix[0][0] = cosf(att.theta)*cosf(att.psi);
-	matrix[0][1] = sinf(att.phi)*sinf(att.theta)*cosf(att.psi) - cosf(att.phi)*sinf(att.psi); 
+	matrix[0][1] = sinf(att.phi)*sinf(att.theta)*cosf(att.psi) - cosf(att.phi)*sinf(att.psi);
 	matrix[0][2] = cosf(att.phi)*sinf(att.theta)*cosf(att.psi) + sinf(att.phi)*sinf(att.psi);
 	matrix[1][0] = cosf(att.theta)*sinf(att.psi);
 	matrix[1][1] = sinf(att.phi)*sinf(att.theta)*sinf(att.psi) + cosf(att.phi)*cosf(att.psi);
@@ -115,8 +115,8 @@ void positionControllerINDIInit(void)
 
 void positionControllerINDI(const sensorData_t *sensors,
                             setpoint_t *setpoint,
-                            const state_t *state, 
-                            vector_t *refOuterINDI){ 
+                            const state_t *state,
+                            vector_t *refOuterINDI){
 
 	// Read states (position, velocity)
 	posS_x = state->position.x;
@@ -127,7 +127,7 @@ void positionControllerINDI(const sensorData_t *sensors,
 	velS_z = -state->velocity.z;
 	gyr_p = sensors->gyro.x;
 	gyr_q = sensors->gyro.y;
-	gyr_r = sensors->gyro.z; 
+	gyr_r = sensors->gyro.z;
 
 	// Read in velocity setpoints
     velocityRef.x = setpoint->velocity.x;
@@ -151,7 +151,7 @@ void positionControllerINDI(const sensorData_t *sensors,
 	// Velocity controller (Proportional)
 	indiOuter.linear_accel_ref.x = K_dxi_x*(velocityRef.x - velS_x);
 	indiOuter.linear_accel_ref.y = K_dxi_y*(velocityRef.y - velS_y);
-	indiOuter.linear_accel_ref.z = K_dxi_z*(velocityRef.z - velS_z); 
+	indiOuter.linear_accel_ref.z = K_dxi_z*(velocityRef.z - velS_z);
 
 	// Acceleration controller (INDI)
 	// Read lin. acceleration (Body-fixed) obtained from sensors CHECKED
@@ -159,11 +159,11 @@ void positionControllerINDI(const sensorData_t *sensors,
 	indiOuter.linear_accel_s.y = (-sensors->acc.y)*9.81f;
 	indiOuter.linear_accel_s.z = (-sensors->acc.z)*9.81f;
 
-	// Filter lin. acceleration 
+	// Filter lin. acceleration
 	filter_ddxi(indiOuter.ddxi, &indiOuter.linear_accel_s, &indiOuter.linear_accel_f);
 
 	// Obtain actual attitude values (in deg)
-	indiOuter.attitude_s.phi = state->attitude.roll; 
+	indiOuter.attitude_s.phi = state->attitude.roll;
 	indiOuter.attitude_s.theta = state->attitude.pitch;
 	indiOuter.attitude_s.psi = -state->attitude.yaw;
 	filter_ang(indiOuter.ang, &indiOuter.attitude_s, &indiOuter.attitude_f);
@@ -190,8 +190,8 @@ void positionControllerINDI(const sensorData_t *sensors,
 	indiOuter.linear_accel_err.y = indiOuter.linear_accel_ref.y - indiOuter.linear_accel_ft.y;
 	indiOuter.linear_accel_err.z = indiOuter.linear_accel_ref.z - indiOuter.linear_accel_ft.z;
 
-	// Elements of the G matrix (see publication for more information) 
-	// ("-" because T points in neg. z-direction, "*9.81" because T/m=a=g, 
+	// Elements of the G matrix (see publication for more information)
+	// ("-" because T points in neg. z-direction, "*9.81" because T/m=a=g,
 	// negative psi to account for wrong coordinate frame in the implementation of the inner loop)
 	float g11 = (cosf(att.phi)*sinf(-att.psi) - sinf(att.phi)*sinf(att.theta)*cosf(-att.psi))*(-9.81f);
 	float g12 = (cosf(att.phi)*cosf(-att.theta)*cosf(-att.psi))*(-9.81f);
@@ -216,7 +216,7 @@ void positionControllerINDI(const sensorData_t *sensors,
 	float a33 = g13*g13 + g23*g23 + g33*g33;
 
 	// Determinant of (G'*G)
-	float detG = (a11*a22*a33 + a12*a23*a31 + a21*a32*a13) - (a13*a22*a31 + a11*a32*a23 + a12*a21*a33); 
+	float detG = (a11*a22*a33 + a12*a23*a31 + a21*a32*a13) - (a13*a22*a31 + a11*a32*a23 + a12*a21*a33);
 
 	// Inverse of (G'*G)
 	float a11_inv = (a22*a33 - a23*a32)/detG;
@@ -227,7 +227,7 @@ void positionControllerINDI(const sensorData_t *sensors,
 	float a23_inv = (a13*a21 - a11*a23)/detG;
 	float a31_inv = (a21*a32 - a22*a31)/detG;
 	float a32_inv = (a12*a31 - a11*a32)/detG;
-	float a33_inv = (a11*a22 - a12*a21)/detG; 
+	float a33_inv = (a11*a22 - a12*a21)/detG;
 
 	// G_inv = (G'*G)_inv*G'
 	float g11_inv = a11_inv*g11 + a12_inv*g12 + a13_inv*g13;
@@ -243,13 +243,13 @@ void positionControllerINDI(const sensorData_t *sensors,
 	// Lin. accel. error multiplied  G^(-1) matrix (T_tilde negated because motor accepts only positiv commands, angles are in rad)
 	indiOuter.phi_tilde   = (g11_inv*indiOuter.linear_accel_err.x + g12_inv*indiOuter.linear_accel_err.y + g13_inv*indiOuter.linear_accel_err.z);
 	indiOuter.theta_tilde = (g21_inv*indiOuter.linear_accel_err.x + g22_inv*indiOuter.linear_accel_err.y + g23_inv*indiOuter.linear_accel_err.z);
-	indiOuter.T_tilde     = -(g31_inv*indiOuter.linear_accel_err.x + g32_inv*indiOuter.linear_accel_err.y + g33_inv*indiOuter.linear_accel_err.z)/K_thr; 	
+	indiOuter.T_tilde     = -(g31_inv*indiOuter.linear_accel_err.x + g32_inv*indiOuter.linear_accel_err.y + g33_inv*indiOuter.linear_accel_err.z)/K_thr;
 
 	// Filter thrust
 	filter_thrust(indiOuter.thr, &indiOuter.T_incremented, &indiOuter.T_inner_f);
 
 	// Pass thrust through the model of the actuator dynamics
-	indiOuter.T_inner = indiOuter.T_inner + indiOuter.act_dyn_posINDI*(indiOuter.T_inner_f - indiOuter.T_inner); 
+	indiOuter.T_inner = indiOuter.T_inner + indiOuter.act_dyn_posINDI*(indiOuter.T_inner_f - indiOuter.T_inner);
 
 	// Compute trust that goes into the inner loop
 		indiOuter.T_incremented = indiOuter.T_tilde + indiOuter.T_inner;
@@ -286,7 +286,7 @@ PARAM_ADD(PARAM_FLOAT, K_dxi_z, &K_dxi_z)
 PARAM_GROUP_STOP(posCtrlIndi)
 
 
-
+#ifndef REDUCED_LOG_TOC
 LOG_GROUP_START(posCtrlIndi)
 
 // Angular veocity
@@ -350,3 +350,4 @@ LOG_ADD(LOG_FLOAT, cmd_phi, &indiOuter.attitude_c.phi)
 LOG_ADD(LOG_FLOAT, cmd_theta, &indiOuter.attitude_c.theta)
 
 LOG_GROUP_STOP(posCtrlIndi)
+#endif
