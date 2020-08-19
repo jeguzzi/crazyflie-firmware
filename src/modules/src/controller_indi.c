@@ -36,7 +36,7 @@ static float roll_kp = 5.0f;
 static float pitch_kp = 5.0f;
 static float yaw_kp = 5.0f;
 
-static float attYawError; 
+static float attYawError;
 
 static float r_roll;
 static float r_pitch;
@@ -199,7 +199,7 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 
 				// INDI position controller not active, INDI attitude controller is main loop
 				attitudeDesired.roll = setpoint->attitude.roll;
-			
+
 		}else{
 			if (outerLoopActive) {
 				// INDI position controller active, INDI attitude controller becomes inner loop
@@ -211,14 +211,14 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 
 				// INDI position controller not active, INDI attitude controller is main loop
 				attitudeDesired.pitch = setpoint->attitude.pitch;
-			
+
 		}else{
 			if (outerLoopActive) {
 				// INDI position controller active, INDI attitude controller becomes inner loop
 				attitudeDesired.pitch = refOuterINDI.y;
 			}
 		}
-		
+
 
 //	    attitudeControllerCorrectAttitudePID(state->attitude.roll, state->attitude.pitch, state->attitude.yaw,
 //	                                attitudeDesired.roll, attitudeDesired.pitch, attitudeDesired.yaw,
@@ -227,7 +227,7 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 		rateDesired.roll = roll_kp*(attitudeDesired.roll - state->attitude.roll);
 		rateDesired.pitch = pitch_kp*(attitudeDesired.pitch - state->attitude.pitch);
 		//rateDesired.yaw = yaw_kp*(attitudeDesired.yaw - state->attitude.yaw);
-		attYawError = attitudeDesired.yaw - state->attitude.yaw;		
+		attYawError = attitudeDesired.yaw - state->attitude.yaw;
 		attYawError = capAngle(attYawError);
 		rateDesired.yaw = yaw_kp*attYawError;
 
@@ -380,25 +380,27 @@ PARAM_ADD(PARAM_FLOAT, filt_cutoff_r, &indi.filt_cutoff_r)
 PARAM_ADD(PARAM_UINT8, outerLoopActive, &outerLoopActive)
 PARAM_GROUP_STOP(ctrlINDI)
 
-// LOG_GROUP_START(ctrlINDI)
-// LOG_ADD(LOG_FLOAT, cmd_thrust, &indi.thrust)
-// LOG_ADD(LOG_FLOAT, cmd_roll, &indi.u_in.p)
-// LOG_ADD(LOG_FLOAT, cmd_pitch, &indi.u_in.q)
-// LOG_ADD(LOG_FLOAT, cmd_yaw, &indi.u_in.r)
-// LOG_ADD(LOG_FLOAT, r_roll, &r_roll)
-// LOG_ADD(LOG_FLOAT, r_pitch, &r_pitch)
-// LOG_ADD(LOG_FLOAT, r_yaw, &r_yaw)
-// LOG_ADD(LOG_FLOAT, accelz, &accelz)
-// LOG_ADD(LOG_FLOAT, u_act_dyn.p, &indi.u_act_dyn.p)
-// LOG_ADD(LOG_FLOAT, u_act_dyn.q, &indi.u_act_dyn.q)
-// LOG_ADD(LOG_FLOAT, u_act_dyn.r, &indi.u_act_dyn.r)
-// LOG_ADD(LOG_FLOAT, du.p, &indi.du.p)
-// LOG_ADD(LOG_FLOAT, du.q, &indi.du.q)
-// LOG_ADD(LOG_FLOAT, du.r, &indi.du.r)
-// LOG_ADD(LOG_FLOAT, ang_accel_ref.p, &indi.angular_accel_ref.p)
-// LOG_ADD(LOG_FLOAT, ang_accel_ref.q, &indi.angular_accel_ref.q)
-// LOG_ADD(LOG_FLOAT, ang_accel_ref.r, &indi.angular_accel_ref.r)
-// LOG_ADD(LOG_FLOAT, rate_d[0], &indi.rate_d[0])
-// LOG_ADD(LOG_FLOAT, rate_d[1], &indi.rate_d[1])
-// LOG_ADD(LOG_FLOAT, rate_d[2], &indi.rate_d[2])
-// LOG_GROUP_STOP(ctrlINDI)
+#ifndef REDUCED_LOG_TOC
+LOG_GROUP_START(ctrlINDI)
+LOG_ADD(LOG_FLOAT, cmd_thrust, &indi.thrust)
+LOG_ADD(LOG_FLOAT, cmd_roll, &indi.u_in.p)
+LOG_ADD(LOG_FLOAT, cmd_pitch, &indi.u_in.q)
+LOG_ADD(LOG_FLOAT, cmd_yaw, &indi.u_in.r)
+LOG_ADD(LOG_FLOAT, r_roll, &r_roll)
+LOG_ADD(LOG_FLOAT, r_pitch, &r_pitch)
+LOG_ADD(LOG_FLOAT, r_yaw, &r_yaw)
+LOG_ADD(LOG_FLOAT, accelz, &accelz)
+LOG_ADD(LOG_FLOAT, u_act_dyn.p, &indi.u_act_dyn.p)
+LOG_ADD(LOG_FLOAT, u_act_dyn.q, &indi.u_act_dyn.q)
+LOG_ADD(LOG_FLOAT, u_act_dyn.r, &indi.u_act_dyn.r)
+LOG_ADD(LOG_FLOAT, du.p, &indi.du.p)
+LOG_ADD(LOG_FLOAT, du.q, &indi.du.q)
+LOG_ADD(LOG_FLOAT, du.r, &indi.du.r)
+LOG_ADD(LOG_FLOAT, ang_accel_ref.p, &indi.angular_accel_ref.p)
+LOG_ADD(LOG_FLOAT, ang_accel_ref.q, &indi.angular_accel_ref.q)
+LOG_ADD(LOG_FLOAT, ang_accel_ref.r, &indi.angular_accel_ref.r)
+LOG_ADD(LOG_FLOAT, rate_d[0], &indi.rate_d[0])
+LOG_ADD(LOG_FLOAT, rate_d[1], &indi.rate_d[1])
+LOG_ADD(LOG_FLOAT, rate_d[2], &indi.rate_d[2])
+LOG_GROUP_STOP(ctrlINDI)
+#endif
