@@ -20,8 +20,8 @@
 #define SETPOINT_PRIORITY (COMMANDER_PRIORITY_CRTP + 1)
 
 // helper function
-
 static float normalize_angle(float value) {
+  value = fmod(value, 2 * M_PI_F);
   if(value > M_PI_F) value -= 2 * M_PI_F;
   else if(value < -M_PI_F) value += 2 * M_PI_F;
   return value;
@@ -69,7 +69,7 @@ static d1_kalman_t x_odom = {.periodic=false, .r_xx=0.012f, .q_vv=2.7f,
                              .state={.p_xx=100, .p_xv=0, .p_vv=10}};
 static d1_kalman_t y_odom = {.periodic=false, .r_xx=0.012f, .q_vv=2.7f,
                              .state={.p_xx=100, .p_xv=0, .p_vv=10}};
-static d1_kalman_t z_odom = {.periodic=false, .r_xx=0.012f, .q_vv=1.0,
+static d1_kalman_t z_odom = {.periodic=false, .r_xx=0.012f, .q_vv=1.0f,
                              .state={.p_xx=100, .p_xv=0, .p_vv=10}};
 static d1_kalman_t phi_odom = {.periodic=true, .r_xx=0.08f, .q_vv=5.3f,
                                  .state={.p_xx=10, .p_xv=0, .p_vv=10}};
@@ -113,7 +113,7 @@ static pose_t target_pose(state_t * state) {
 static velocity_t desired_velocity(point_t position, velocity_t velocity,
                                    point_t target_position, velocity_t target_velocity) {
   velocity_t v;
-  v.z = clamp((target_position.z - position.z) / eta + target_velocity.z, -maximal_vertical_speed, maximal_vertical_speed);
+  v.z = clamp((target_position.z - position.z) / eta, -maximal_vertical_speed, maximal_vertical_speed);
   v.x = (target_position.x - position.x) / eta + target_velocity.x;
   v.y = (target_position.y - position.y) / eta + target_velocity.y;
   float speed = sqrtf(v.x * v.x + v.y * v.y);
