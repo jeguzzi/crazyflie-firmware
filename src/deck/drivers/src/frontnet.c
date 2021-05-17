@@ -10,10 +10,15 @@
 #include "debug.h"
 #include "worker.h"
 #include "math3d.h"
+#include "pm.h"
 #include "aideck_protocol.h"
 
+// Uncomment to make the drone land when the battery is lower than `min_voltage`
+#define LAND_WHEN_BATTERY_IS_LOW
+static float min_voltage = 3.1f; // PM_BAT_LOW_VOLTAGE
+
 // Uncomment to log the kalman state
-// #define LOG_FILTERED_ODOM
+#define LOG_FILTERED_ODOM
 // The setpoint priority.
 // If larger than COMMANDER_PRIORITY_CRTP = 1, our control setpoint will have priority
 // over external [crtp] setpoints)
@@ -39,6 +44,8 @@ static bool relative_altitude = false;
 static float target_range = 1.3f;
 static float target_altitude = 1.4f;
 static float eta = 1.0f;
+static float rotation_tau = 0.5f;
+static float k = 1.0f;
 static float maximal_speed = 1.0f;
 static float maximal_angular_speed = 1.0f;
 static float maximal_vertical_speed = 0.5f;
@@ -114,8 +121,8 @@ static velocity_t desired_velocity(point_t position, velocity_t velocity,
                                    point_t target_position, velocity_t target_velocity) {
   velocity_t v;
   v.z = clamp((target_position.z - position.z) / eta, -maximal_vertical_speed, maximal_vertical_speed);
-  v.x = (target_position.x - position.x) / eta + target_velocity.x;
-  v.y = (target_position.y - position.y) / eta + target_velocity.y;
+  v.x = (target_position.x - position.x) / eta + k * target_velocity.x;
+  v.y = (target_position.y - position.y) / eta + k * target_velocity.y;
   float speed = sqrtf(v.x * v.x + v.y * v.y);
   if(speed > maximal_speed) {
     v.x *= maximal_speed / speed;
@@ -127,7 +134,7 @@ static velocity_t desired_velocity(point_t position, velocity_t velocity,
 static attitude_t desired_angular_velocity(attitude_t attitude, attitude_t target_attitude) {
   float diff = normalize_angle(target_attitude.yaw - attitude.yaw);
   attitude_t omega;
-  omega.yaw = clamp(diff / eta, -maximal_angular_speed, maximal_angular_speed);
+  omega.yaw = clamp(diff / rotation_tau, -maximal_angular_speed, maximal_angular_speed);
   return omega;
 }
 
@@ -170,6 +177,21 @@ static void updateTimer(xTimerHandle timer) {
   }
 }
 
+static void land_from(float z, float duration) {
+  setpoint.attitudeRate.yaw = 0.0f;
+  setpoint.velocity.x = setpoint.velocity.y = 0.0f;
+  setpoint.velocity.z = -(z - 0.2f) / duration;
+  setpoint.timestamp = lastUpdate;
+  commanderSetSetpoint(&setpoint, COMMANDER_PRIORITY_CRTP);
+}
+
+static void hover() {
+  setpoint.attitudeRate.yaw = 0.0f;
+  setpoint.velocity.x = setpoint.velocity.y = setpoint.velocity.z = 0.0f;
+  setpoint.timestamp = lastUpdate;
+  commanderSetSetpoint(&setpoint, COMMANDER_PRIORITY_CRTP);
+}
+
 void inference_output_callback(inference_output_t *value) {
   x_ = value->x;
   y_ = value->y;
@@ -194,12 +216,21 @@ void inference_output_callback(inference_output_t *value) {
 #if defined(FREQ_STEPS) && FREQ_STEPS > 0
   if(number_of_updates % FREQ_STEPS == 0) {
     if(prevUpdate){
-      update_hz = 1000 * FREQ_STEPS / T2M(lastUpdate - prevUpdate);
+      update_hz = (uint8_t) (1000 * FREQ_STEPS / T2M(lastUpdate - prevUpdate));
     }
     prevUpdate = lastUpdate;
     number_of_updates = 0;
   }
 #endif
+
+  if(control_active && pmGetBatteryVoltage() < min_voltage) {
+    control_active = false;
+#ifdef LAND_WHEN_BATTERY_IS_LOW
+    land_from(state.position.z, 2.0);
+#else
+    hover();
+#endif
+  }
 
   if(!should_control) {
     control_active = false;
@@ -223,6 +254,8 @@ PARAM_ADD(PARAM_UINT8, rel_altitude, &relative_altitude)
 PARAM_ADD(PARAM_FLOAT, distance, &target_range)
 PARAM_ADD(PARAM_FLOAT, altitude, &target_altitude)
 PARAM_ADD(PARAM_FLOAT, eta, &eta)
+PARAM_ADD(PARAM_FLOAT, rotation_tau, &rotation_tau)
+PARAM_ADD(PARAM_FLOAT, k, &k)
 PARAM_ADD(PARAM_FLOAT, max_speed, &maximal_speed)
 PARAM_ADD(PARAM_FLOAT, max_ang_speed, &maximal_angular_speed)
 PARAM_ADD(PARAM_FLOAT, max_vert_speed, &maximal_vertical_speed)
@@ -234,6 +267,7 @@ PARAM_ADD(PARAM_FLOAT, kalman_z_q, &z_odom.q_vv)
 PARAM_ADD(PARAM_FLOAT, kalman_z_r, &z_odom.r_xx)
 PARAM_ADD(PARAM_FLOAT, kalman_phi_q, &phi_odom.q_vv)
 PARAM_ADD(PARAM_FLOAT, kalman_phi_r, &phi_odom.r_xx)
+PARAM_ADD(PARAM_FLOAT, min_voltage, &min_voltage)
 PARAM_GROUP_STOP(frontnet)
 
 LOG_GROUP_START(frontnet)
@@ -251,7 +285,7 @@ LOG_ADD(LOG_FLOAT, f_z, &z_odom.state.x)
 LOG_ADD(LOG_FLOAT, f_phi, &phi_odom.state.x)
 LOG_ADD(LOG_FLOAT, f_vx, &x_odom.state.v)
 LOG_ADD(LOG_FLOAT, f_vy, &y_odom.state.v)
-LOG_ADD(LOG_FLOAT, f_vz, &z_odom.state.x)
+LOG_ADD(LOG_FLOAT, f_vz, &z_odom.state.v)
 LOG_ADD(LOG_FLOAT, f_vphi, &phi_odom.state.v)
 #endif // LOG_FILTERED_ODOM
 LOG_GROUP_STOP(frontnet)
