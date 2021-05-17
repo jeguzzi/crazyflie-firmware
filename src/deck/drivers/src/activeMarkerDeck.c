@@ -190,7 +190,7 @@ static void task(void *param) {
 
     vTaskDelay(M2T(delay));
   }
-  
+
 }
 
 static const DeckDriver deck_info = {
@@ -218,7 +218,9 @@ PARAM_ADD(PARAM_UINT8, canStart, &activeMarkerDeckCanStart)
 
 PARAM_GROUP_STOP(activeMarker)
 
+#ifndef REDUCED_LOG_TOC
 LOG_GROUP_START(activeMarker)
 LOG_ADD(LOG_UINT8, btSns, &deckButtonSensorValue)
 LOG_ADD(LOG_UINT8, i2cOk, &i2cOk)
 LOG_GROUP_STOP(activeMarker)
+#endif

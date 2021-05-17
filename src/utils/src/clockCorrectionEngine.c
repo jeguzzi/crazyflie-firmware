@@ -121,6 +121,7 @@ bool clockCorrectionEngineUpdate(clockCorrectionStorage_t* storage, const double
   return sampleIsReliable;
 }
 
+#ifndef REDUCED_LOG_TOC
 #ifdef CLOCK_CORRECTION_ENABLE_LOGGING
 LOG_GROUP_START(CkCorrection)
 LOG_ADD(LOG_FLOAT, minNoise, &logMinAcceptedNoiseLimit)
@@ -130,4 +131,5 @@ LOG_ADD(LOG_FLOAT, maxSpec, &logMaxSpecLimit)
 LOG_ADD(LOG_FLOAT, actualValue, &logClockCorrection)
 LOG_ADD(LOG_FLOAT, candidate, &logClockCorrectionCandidate)
 LOG_GROUP_STOP(CkCorrection)
+#endif
 #endif
